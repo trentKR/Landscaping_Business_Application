@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html>
+<body style="font-family: Arial, sans-serif; color: #1a1a1a; font-size: 14px; line-height: 1.6;">
+    <p>Hi {{ invoice.client.first_name }},</p>
+    <p>Please find your invoice <strong>{{ invoice.invoice_number }}</strong> attached.</p>
+    <table style="margin: 1rem 0; border-collapse: collapse;">
+        <tr>
+            <td style="padding: 4px 16px 4px 0; color: #6b7280;">Invoice Date</td>
+            <td style="padding: 4px 0; font-weight: 600;">{{ invoice.invoice_date.strftime('%B %d, %Y') }}</td>
+        </tr>
+        <tr>
+            <td style="padding: 4px 16px 4px 0; color: #6b7280;">Invoice Total</td>
+            <td style="padding: 4px 0; font-weight: 600;">{{ invoice.subtotal|currency }}</td>
+        </tr>
+        {% if invoice.status == 'paid' %}
+        <tr>
+            <td colspan="2" style="padding: 8px 0 4px 0; font-weight: 600; color: #16a34a;">&#10003; Paid in Full</td>
+        </tr>
+        {% else %}
+        {% if outstanding %}
+        <tr>
+            <td colspan="2" style="padding: 8px 0 2px 0; font-size: 12px; font-weight: 600; color: #6b7280;">Outstanding Invoices</td>
+        </tr>
+        {% for number, amount in outstanding %}
+        <tr>
+            <td style="padding: 1px 16px 1px 0; font-size: 12px; color: #6b7280;">{{ number }}</td>
+            <td style="padding: 1px 0; font-size: 12px;">{{ amount|currency }}</td>
+        </tr>
+        {% endfor %}
+        {% endif %}
+        <tr>
+            <td style="padding: 4px 16px 4px 0; color: #6b7280;">Account Balance</td>
+            <td style="padding: 4px 0; font-weight: 600;">{{ account_balance|currency }}</td>
+        </tr>
+        <tr>
+            <td colspan="2" style="padding: 0 0 4px 0; font-size: 11px; color: #9ca3af;">as of {{ today.strftime('%B') }} {{ today.day }}, {{ today.year }}</td>
+        </tr>
+        {% endif %}
+    </table>
+    <table style="margin: 1.5rem 0; border-collapse: collapse; width: 100%;">
+        <tr>
+            <td style="padding: 16px; background: #f0fdf4; border-radius: 8px;">
+                {% if setup_url or portal_dashboard_url %}
+                <p style="margin: 0 0 12px 0; font-size: 13px; color: #4b5563;">View all your invoices, payments, and account balance online:</p>
+                {% if setup_url %}
+                <a href="{{ setup_url }}" style="display:inline-block;padding:10px 20px;background:#16a34a;color:#fff;text-decoration:none;border-radius:6px;font-weight:600;font-size:14px;">Set Up Your Portal</a>
+                <p style="margin: 10px 0 0 0; font-size: 11px; color: #9ca3af;">This link expires in 7 days.</p>
+                {% else %}
+                <a href="{{ portal_dashboard_url }}" style="display:inline-block;padding:10px 20px;background:#16a34a;color:#fff;text-decoration:none;border-radius:6px;font-weight:600;font-size:14px;">Go to Customer Portal</a>
+                {% endif %}
+                <p style="margin: 14px 0 0 0; font-size: 12px; color: #4b5563;">
+                    Log in anytime at <a href="{{ marketing_url }}" style="color: #16a34a; text-decoration: none; font-weight: 600;">{{ marketing_display }}</a>.
+                </p>
+                {% else %}
+                <p style="margin: 0; font-size: 13px; color: #4b5563;">
+                    View all your invoices, payments, and account balance online &mdash; log in anytime at <a href="{{ marketing_url }}" style="color: #16a34a; text-decoration: none; font-weight: 600;">{{ marketing_display }}</a>.
+                </p>
+                {% endif %}
+            </td>
+        </tr>
+    </table>
+    <table style="margin: 1.5rem 0; border-collapse: collapse; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; width: 100%;">
+        <tr>
+            <td colspan="2" style="padding: 14px 16px 6px 16px; font-size: 14px; font-weight: 600; color: #14532d;">Ways to Pay</td>
+        </tr>
+        <tr>
+            <td style="padding: 3px 12px 3px 16px; color: #6b7280; font-weight: 500; font-size: 13px;">Cash</td>
+            <td style="padding: 3px 16px 3px 0; font-weight: 600; color: #111827; font-size: 13px;"></td>
+        </tr>
+        <tr>
+            <td style="padding: 3px 12px 3px 16px; color: #6b7280; font-weight: 500; font-size: 13px;">Check</td>
+            <td style="padding: 3px 16px 3px 0; font-weight: 600; color: #111827; font-size: 13px;">{{ config.PAYMENT_NAME }}</td>
+        </tr>
+        <tr>
+            <td style="padding: 3px 12px 3px 16px; color: #6b7280; font-weight: 500; font-size: 13px;">Venmo</td>
+            <td style="padding: 3px 16px 3px 0; font-weight: 600; color: #111827; font-size: 13px;">{{ config.VENMO_HANDLE }}</td>
+        </tr>
+        <tr>
+            <td style="padding: 3px 12px 3px 16px; color: #6b7280; font-weight: 500; font-size: 13px;">Cash App</td>
+            <td style="padding: 3px 16px 3px 0; font-weight: 600; color: #111827; font-size: 13px;">{{ config.CASHAPP_HANDLE }}</td>
+        </tr>
+        <tr>
+            <td style="padding: 3px 12px 3px 16px; color: #6b7280; font-weight: 500; font-size: 13px; padding-bottom: 14px;">Zelle</td>
+            <td style="padding: 3px 16px 3px 0; font-weight: 600; color: #111827; font-size: 13px; padding-bottom: 14px;">{{ config.ZELLE_PHONE }}</td>
+        </tr>
+    </table>
+    <p>Thank you for your business!</p>
+    <p style="margin-top: 2rem; font-size: 12px; color: #9ca3af;">Clips by Rorabaugh, LLC</p>
+</body>
+</html>

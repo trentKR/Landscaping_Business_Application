@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}Payroll - Clips Admin{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <h1><i class="bi bi-wallet2"></i> Payroll</h1>
+    <a href="{{ url_for('payroll.payroll_quick_add') }}" class="btn btn-green">
+        <i class="bi bi-plus-circle"></i> Add Entry
+    </a>
+</div>
+
+<!-- Filters -->
+<div class="card shadow-sm mb-3">
+    <div class="card-body py-2">
+        <form method="GET" class="row g-2 align-items-end">
+            <div class="col-md-3">
+                <input type="date" class="form-control" name="date_from"
+                       value="{{ date_from }}" placeholder="From">
+            </div>
+            <div class="col-md-3">
+                <input type="date" class="form-control" name="date_to"
+                       value="{{ date_to }}" placeholder="To">
+            </div>
+            <div class="col-md-6 d-flex gap-2">
+                <button type="submit" class="btn btn-green">
+                    <i class="bi bi-search"></i> Filter
+                </button>
+                <a href="{{ url_for('payroll.payroll') }}" class="btn btn-outline-secondary">Clear</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Payroll table -->
+<div class="card shadow-sm">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Employee</th>
+                        <th class="text-end">Hours</th>
+                        <th class="text-end">Rate</th>
+                        <th class="text-end">Total</th>
+                        <th class="d-none d-md-table-cell">Notes</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for e in entries %}
+                    <tr>
+                        <td>{{ e.work_date.strftime('%m/%d/%Y') }}</td>
+                        <td class="fw-bold">{{ e.employee_name }}</td>
+                        <td class="text-end">{{ e.hours }}</td>
+                        <td class="text-end">{{ e.hourly_rate|currency }}</td>
+                        <td class="text-end fw-bold">{{ e.total_payment|currency }}</td>
+                        <td class="d-none d-md-table-cell text-muted">{{ e.notes }}</td>
+                        <td>
+                            <div class="d-flex gap-1">
+                                <a href="{{ url_for('payroll.payroll_edit', entry_id=e.id) }}" class="btn btn-sm btn-outline-secondary" aria-label="Edit payroll entry">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                                <form method="POST" action="{{ url_for('payroll.payroll_delete', entry_id=e.id) }}"
+                                      onsubmit="return confirm('Are you sure you want to delete this payroll entry? This cannot be undone.')">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger" aria-label="Delete payroll entry">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="7">
+                            <div class="empty-state">
+                                <i class="bi bi-wallet2"></i>
+                                <h5>No payroll entries found</h5>
+                                <p>Try adjusting your filter criteria or add a new entry.</p>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <div class="card-footer d-flex justify-content-between">
+        <span class="text-muted small">{{ entries|length }} {{ 'entry' if entries|length == 1 else 'entries' }}</span>
+        <span class="fw-bold">Total: {{ total|currency }}</span>
+    </div>
+</div>
+{% endblock %}

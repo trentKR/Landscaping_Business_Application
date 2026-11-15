@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit Employee' if employee else 'Add Employee' }} - Clips Admin{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>
+        <i class="bi bi-person-badge"></i>
+        {{ 'Edit Employee' if employee else 'Add Employee' }}
+    </h1>
+</div>
+
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card shadow-sm">
+            <div class="card-header form-card-header">
+                {{ 'Edit Employee' if employee else 'Add Employee' }}
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">First Name <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" name="first_name" required
+                                   value="{{ employee.first_name if employee else '' }}"
+                                   placeholder="e.g., John">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Last Name <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" name="last_name" required
+                                   value="{{ employee.last_name if employee else '' }}"
+                                   placeholder="e.g., Smith">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Default Hourly Rate</label>
+                            <div class="input-group">
+                                <span class="input-group-text">$</span>
+                                <input type="number" class="form-control" name="default_hourly_rate"
+                                       step="0.01" min="0"
+                                       value="{{ '%.2f' % employee.default_hourly_rate if employee else '0.00' }}"
+                                       placeholder="0.00">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Email</label>
+                            <input type="email" class="form-control" name="email"
+                                   value="{{ employee.email if employee else '' }}"
+                                   placeholder="e.g., john@example.com">
+                            <div class="form-text">Required for portal access</div>
+                        </div>
+                        {% if employee %}
+                        <div class="col-12">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="active" id="activeCheck"
+                                       {% if employee.active %}checked{% endif %}>
+                                <label class="form-check-label" for="activeCheck">Active</label>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    {% if employee and employee.email %}
+                    <hr>
+                    <div class="d-flex align-items-center gap-3">
+                        <span class="fw-medium">Portal Access:</span>
+                        {% if employee.has_portal_access %}
+                        <span class="badge badge-paid">Portal Active</span>
+                        {% else %}
+                        <span class="text-muted">Not set up</span>
+                        {% endif %}
+                        {% if employee.portal_invite_sent_at %}
+                        <span class="text-muted small">Invite sent {{ employee.portal_invite_sent_at.strftime('%b %d, %Y').replace(' 0', ' ') }}</span>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+
+                    <hr>
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-green">
+                            <i class="bi bi-check-lg"></i>
+                            {{ 'Save Changes' if employee else 'Create Employee' }}
+                        </button>
+                        <a href="{{ url_for('payroll.employees') }}" class="btn btn-outline-secondary">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        {% if employee and employee.email and not employee.has_portal_access %}
+        <div class="card shadow-sm mt-3">
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('payroll.employee_portal_invite', employee_id=employee.id) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-outline-primary">
+                        <i class="bi bi-envelope"></i> Send Portal Invite
+                    </button>
+                </form>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

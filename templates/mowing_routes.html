@@ -1,0 +1,286 @@
+{% extends "base.html" %}
+{% block title %}Mowing Routes - Clips Admin{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <h1><i class="bi bi-signpost-2"></i> Mowing Routes</h1>
+    <a href="{{ url_for('routes_bp.route_new') }}" class="btn btn-green">
+        <i class="bi bi-plus-circle"></i> New Route
+    </a>
+</div>
+
+{% if routes or unassigned %}
+<div class="accordion route-accordion" id="routeAccordion">
+    {% for route in routes %}
+    <div class="accordion-item">
+        <h2 class="accordion-header">
+            <div class="d-flex align-items-center">
+                <button class="accordion-button" type="button"
+                        data-bs-toggle="collapse" data-bs-target="#route_{{ route.id }}"
+                        data-route-id="{{ route.id }}"
+                        style="flex:1; min-width:0;">
+                    {{ route.name }}
+                    <span class="badge badge-category ms-2">{{ route.client_count }} client{{ 's' if route.client_count != 1 else '' }}</span>
+                </button>
+                <div class="d-flex gap-1 px-3 flex-shrink-0">
+                    <a href="{{ url_for('routes_bp.route_edit', route_id=route.id) }}" class="btn btn-sm btn-outline-secondary">
+                        <i class="bi bi-pencil"></i>
+                    </a>
+                    <form method="POST" action="{{ url_for('routes_bp.route_delete', route_id=route.id) }}"
+                          onsubmit="return confirm('Delete route &quot;{{ route.name }}&quot;? Clients will be unassigned.')">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn btn-sm btn-outline-danger">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </h2>
+        <div id="route_{{ route.id }}" class="accordion-collapse collapse show">
+            <div class="accordion-body p-0">
+                {% set clients = route.clients.filter_by(active=True).order_by(None).order_by('route_position').all() %}
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th style="width:32px"></th>
+                                <th style="width:40px">#</th>
+                                <th>Name</th>
+                                <th class="d-none d-md-table-cell">Address</th>
+                                <th class="text-end">Rate</th>
+                                <th style="width:40px"></th>
+                            </tr>
+                        </thead>
+                        <tbody data-route-id="{{ route.id }}">
+                            {% if clients %}
+                                {% for c in clients %}
+                                <tr data-client-id="{{ c.id }}">
+                                    <td class="drag-handle"><i class="bi bi-grip-vertical"></i></td>
+                                    <td class="text-muted">{{ c.route_position or loop.index }}</td>
+                                    <td>
+                                        <a href="{{ url_for('clients.client_detail', client_id=c.id) }}">
+                                            {{ c.full_name }}
+                                        </a>
+                                    </td>
+                                    <td class="text-muted d-none d-md-table-cell">{{ c.full_address }}</td>
+                                    <td class="text-end fw-bold">{{ c.default_mowing_rate|currency }}</td>
+                                    <td class="text-end">
+                                        <a href="{{ url_for('clients.client_detail', client_id=c.id) }}"
+                                           class="btn btn-sm btn-outline-secondary" aria-label="View {{ c.full_name }}">
+                                            <i class="bi bi-arrow-right"></i>
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            {% else %}
+                            <tr class="sortable-placeholder-row">
+                                <td colspan="6" class="text-center text-muted py-3">
+                                    <i class="bi bi-arrow-down-circle me-1"></i> Drop clients here
+                                </td>
+                            </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+
+    <div class="accordion-item route-unassigned">
+        <h2 class="accordion-header">
+            <button class="accordion-button" type="button"
+                    data-bs-toggle="collapse" data-bs-target="#unassigned"
+                    data-route-id="unassigned">
+                Unassigned
+                <span class="badge badge-category ms-2">{{ unassigned|length }} client{{ 's' if unassigned|length != 1 else '' }}</span>
+            </button>
+        </h2>
+        <div id="unassigned" class="accordion-collapse collapse show">
+            <div class="accordion-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th style="width:32px"></th>
+                                <th style="width:40px">#</th>
+                                <th>Name</th>
+                                <th class="d-none d-md-table-cell">Address</th>
+                                <th class="text-end">Rate</th>
+                                <th style="width:40px"></th>
+                            </tr>
+                        </thead>
+                        <tbody data-route-id="unassigned">
+                            {% if unassigned %}
+                                {% for c in unassigned %}
+                                <tr data-client-id="{{ c.id }}">
+                                    <td class="drag-handle"><i class="bi bi-grip-vertical"></i></td>
+                                    <td class="text-muted"></td>
+                                    <td>
+                                        <a href="{{ url_for('clients.client_detail', client_id=c.id) }}">
+                                            {{ c.full_name }}
+                                        </a>
+                                    </td>
+                                    <td class="text-muted d-none d-md-table-cell">{{ c.full_address }}</td>
+                                    <td class="text-end fw-bold">{{ c.default_mowing_rate|currency }}</td>
+                                    <td class="text-end">
+                                        <a href="{{ url_for('clients.client_detail', client_id=c.id) }}"
+                                           class="btn btn-sm btn-outline-secondary" aria-label="View {{ c.full_name }}">
+                                            <i class="bi bi-arrow-right"></i>
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            {% else %}
+                            <tr class="sortable-placeholder-row">
+                                <td colspan="6" class="text-center text-muted py-3">
+                                    <i class="bi bi-arrow-down-circle me-1"></i> Drop clients here to unassign
+                                </td>
+                            </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% else %}
+<div class="card shadow-sm">
+    <div class="card-body text-center py-5">
+        <i class="bi bi-signpost-2 text-muted" style="font-size: 3rem"></i>
+        <h5 class="mt-3 text-muted">No mowing routes yet</h5>
+        <p class="text-muted">Create a route to group your clients for efficient service delivery.</p>
+        <a href="{{ url_for('routes_bp.route_new') }}" class="btn btn-green">
+            <i class="bi bi-plus-circle"></i> Create First Route
+        </a>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+<script>
+(function () {
+    const CSRF_TOKEN = document.querySelector('meta[name="csrf-token"]').content;
+
+    function getOrderedIds(tbody) {
+        return Array.from(tbody.querySelectorAll('tr[data-client-id]'))
+            .map(tr => parseInt(tr.dataset.clientId, 10));
+    }
+
+    function updateBadge(routeId, delta) {
+        const btn = document.querySelector(`[data-route-id="${routeId}"]`);
+        if (!btn) return;
+        const badge = btn.querySelector('.badge');
+        if (!badge) return;
+        const next = (parseInt(badge.textContent, 10) || 0) + delta;
+        badge.textContent = next + (next === 1 ? ' client' : ' clients');
+    }
+
+    function renumberRows(tbody) {
+        if (tbody.dataset.routeId === 'unassigned') {
+            tbody.querySelectorAll('tr[data-client-id] td:nth-child(2)').forEach(td => {
+                td.textContent = '';
+            });
+            return;
+        }
+        tbody.querySelectorAll('tr[data-client-id]').forEach((tr, i) => {
+            tr.querySelector('td:nth-child(2)').textContent = i + 1;
+        });
+    }
+
+    function syncPlaceholders(tbody) {
+        const rows = tbody.querySelectorAll('tr[data-client-id]');
+        const placeholder = tbody.querySelector('.sortable-placeholder-row');
+        if (rows.length === 0 && !placeholder) {
+            const isUnassigned = tbody.dataset.routeId === 'unassigned';
+            const tr = document.createElement('tr');
+            tr.className = 'sortable-placeholder-row';
+            tr.innerHTML = `<td colspan="6" class="text-center text-muted py-3">
+                <i class="bi bi-arrow-down-circle me-1"></i> Drop clients here${isUnassigned ? ' to unassign' : ''}
+            </td>`;
+            tbody.appendChild(tr);
+        } else if (rows.length > 0 && placeholder) {
+            placeholder.remove();
+        }
+    }
+
+    function revertMove(evt) {
+        const movedRow = evt.item;
+        movedRow.parentNode.removeChild(movedRow);
+        const refRows = Array.from(evt.from.querySelectorAll('tr[data-client-id]'));
+        if (evt.oldIndex >= refRows.length) {
+            evt.from.appendChild(movedRow);
+        } else {
+            evt.from.insertBefore(movedRow, refRows[evt.oldIndex]);
+        }
+    }
+
+    document.querySelectorAll('tbody[data-route-id]').forEach(tbody => {
+        Sortable.create(tbody, {
+            group: 'routes',
+            handle: '.drag-handle',
+            animation: 150,
+            ghostClass: 'sortable-ghost',
+            chosenClass: 'sortable-chosen',
+            onEnd(evt) {
+                const fromTbody = evt.from;
+                const toTbody = evt.to;
+                const clientId = parseInt(evt.item.dataset.clientId, 10);
+                const sourceRouteId = fromTbody.dataset.routeId;
+                const targetRouteId = toTbody.dataset.routeId;
+
+                if (fromTbody === toTbody && evt.oldIndex === evt.newIndex) return;
+
+                // Immediately renumber affected routes
+                renumberRows(toTbody);
+                if (fromTbody !== toTbody) renumberRows(fromTbody);
+
+                const sourceOrderedIds = getOrderedIds(fromTbody);
+                const targetOrderedIds = fromTbody === toTbody
+                    ? sourceOrderedIds
+                    : getOrderedIds(toTbody);
+
+                fetch('/api/mowing-routes/move-client', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': CSRF_TOKEN
+                    },
+                    body: JSON.stringify({
+                        client_id: clientId,
+                        target_route_id: targetRouteId === 'unassigned' ? null : parseInt(targetRouteId, 10),
+                        source_ordered_ids: sourceOrderedIds,
+                        target_ordered_ids: targetOrderedIds
+                    })
+                })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success) {
+                        if (fromTbody !== toTbody) {
+                            updateBadge(sourceRouteId, -1);
+                            updateBadge(targetRouteId, 1);
+                            syncPlaceholders(fromTbody);
+                            syncPlaceholders(toTbody);
+                        }
+                    } else {
+                        revertMove(evt);
+                        renumberRows(fromTbody);
+                        if (fromTbody !== toTbody) renumberRows(toTbody);
+                        console.error('Move failed:', data.error);
+                    }
+                })
+                .catch(err => {
+                    revertMove(evt);
+                    renumberRows(fromTbody);
+                    if (fromTbody !== toTbody) renumberRows(toTbody);
+                    console.error('Move request failed:', err);
+                });
+            }
+        });
+    });
+})();
+</script>
+{% endblock %}

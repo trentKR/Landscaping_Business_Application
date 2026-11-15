@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+{% block title %}Create Invoice - Clips Admin{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1><i class="bi bi-receipt"></i> Create Invoice</h1>
+</div>
+
+<form method="POST" id="invoiceForm">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="row g-3">
+        <div class="col-md-8">
+            <div class="card shadow-sm mb-3">
+                <div class="card-header form-card-header">Invoice Details</div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Client <span class="text-danger">*</span></label>
+                            <select class="form-select" name="client_id" id="clientSelect" required>
+                                <option value="">Select a client...</option>
+                                {% for c in clients %}
+                                <option value="{{ c.id }}" {% if preselect_client == c.id %}selected{% endif %}>
+                                    {{ c.full_name }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Invoice Date</label>
+                            <input type="date" class="form-control" name="invoice_date" value="{{ today.isoformat() }}" required>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Uninvoiced services -->
+            <div class="card shadow-sm mb-3">
+                <div class="card-header bg-white fw-bold d-flex justify-content-between align-items-center">
+                    <span>Uninvoiced Services</span>
+                    <div>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" id="selectAll">Select All</button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" id="deselectAll">Deselect All</button>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div id="servicesContainer">
+                        <div class="text-center text-muted py-3" id="servicesPlaceholder">
+                            Select a client to load uninvoiced services.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+<div class="mb-3">
+                <label class="form-label">Notes</label>
+                <textarea class="form-control" name="notes" rows="2"></textarea>
+            </div>
+        </div>
+
+        <!-- Summary sidebar -->
+        <div class="col-md-4">
+            <div class="card shadow-sm" style="position: sticky; top: 1rem;">
+                <div class="card-header bg-white fw-bold">Summary</div>
+                <div class="card-body">
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Services selected:</span>
+                        <strong id="selectedCount">0</strong>
+                    </div>
+                    <div class="d-flex justify-content-between mb-3">
+                        <span>Total:</span>
+                        <strong class="stat-value" id="runningTotal">$0.00</strong>
+                    </div>
+                    <button type="submit" class="btn btn-green w-100" id="submitBtn" disabled>
+                        <i class="bi bi-receipt"></i> Create Invoice
+                    </button>
+                    <a href="{{ url_for('invoices.invoice_list') }}" class="btn btn-outline-secondary w-100 mt-2">Cancel</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const clientSelect = document.getElementById('clientSelect');
+    const servicesContainer = document.getElementById('servicesContainer');
+    const placeholder = document.getElementById('servicesPlaceholder');
+    const selectAllBtn = document.getElementById('selectAll');
+    const deselectAllBtn = document.getElementById('deselectAll');
+    const selectedCount = document.getElementById('selectedCount');
+    const runningTotal = document.getElementById('runningTotal');
+    const submitBtn = document.getElementById('submitBtn');
+
+    function updateTotals() {
+        let count = 0;
+        let total = 0;
+        document.querySelectorAll('.service-checkbox:checked').forEach(cb => {
+            count++;
+            total += parseFloat(cb.dataset.amount);
+        });
+        selectedCount.textContent = count;
+        runningTotal.textContent = '$' + total.toFixed(2);
+        submitBtn.disabled = count === 0;
+    }
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    function loadServices(clientId) {
+        if (!clientId) {
+            servicesContainer.innerHTML = '<div class="text-center text-muted py-3">Select a client to load uninvoiced services.</div>';
+            updateTotals();
+            return;
+        }
+        servicesContainer.innerHTML = '<div class="text-center py-3"><div class="spinner-border spinner-border-sm text-secondary"></div> Loading...</div>';
+        fetch('{{ url_for("services_bp.api_uninvoiced_services", client_id=0) }}'.replace('/0', '/' + clientId))
+            .then(r => r.json())
+            .then(services => {
+                if (services.length === 0) {
+                    servicesContainer.innerHTML = '<div class="text-center text-muted py-3">No uninvoiced services for this client.</div>';
+                    updateTotals();
+                    return;
+                }
+                let html = '<div class="table-responsive"><table class="table table-hover mb-0"><thead><tr><th style="width:40px"></th><th>Date</th><th>Type</th><th>Description</th><th class="text-end">Amount</th></tr></thead><tbody>';
+                services.forEach(s => {
+                    html += '<tr><td><input type="checkbox" class="form-check-input service-checkbox" name="service_ids" value="' + parseInt(s.id) + '" data-amount="' + parseFloat(s.amount) + '"></td>';
+                    html += '<td>' + escapeHtml(s.date_display) + '</td>';
+                    html += '<td>' + escapeHtml(s.type) + '</td>';
+                    html += '<td class="text-muted">' + escapeHtml(s.description || '') + '</td>';
+                    html += '<td class="text-end fw-bold">$' + parseFloat(s.amount).toFixed(2) + '</td></tr>';
+                });
+                html += '</tbody></table></div>';
+                servicesContainer.innerHTML = html;
+
+                document.querySelectorAll('.service-checkbox').forEach(cb => {
+                    cb.addEventListener('change', updateTotals);
+                });
+                updateTotals();
+            });
+    }
+
+    clientSelect.addEventListener('change', function() {
+        loadServices(this.value);
+    });
+
+    // Auto-load if preselected
+    if (clientSelect.value) {
+        loadServices(clientSelect.value);
+    }
+
+    selectAllBtn.addEventListener('click', function() {
+        document.querySelectorAll('.service-checkbox').forEach(cb => { cb.checked = true; });
+        updateTotals();
+    });
+
+    deselectAllBtn.addEventListener('click', function() {
+        document.querySelectorAll('.service-checkbox').forEach(cb => { cb.checked = false; });
+        updateTotals();
+    });
+
+
+});
+</script>
+{% endblock %}

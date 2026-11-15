@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Vendors - Clips Admin{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <h1><i class="bi bi-shop"></i> Vendors</h1>
+    <a href="{{ url_for('vendors.vendor_new') }}" class="btn btn-green">
+        <i class="bi bi-plus-circle"></i> Add Vendor
+    </a>
+</div>
+
+<!-- Filter -->
+<div class="card shadow-sm mb-3">
+    <div class="card-body py-2">
+        <form method="GET" class="row g-2 align-items-end">
+            <div class="col-md-3">
+                <input type="text" class="form-control" name="search"
+                       value="{{ search }}" placeholder="Search vendors...">
+            </div>
+            <div class="col-md-9 d-flex gap-2">
+                <button type="submit" class="btn btn-green">
+                    <i class="bi bi-search"></i> Filter
+                </button>
+                <a href="{{ url_for('vendors.vendor_list') }}" class="btn btn-outline-secondary">Clear</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Vendor</th>
+                        <th>Contact</th>
+                        <th>Phone</th>
+                        <th class="text-end">Total Spent</th>
+                        <th class="text-center">Expenses</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for v in vendors %}
+                    <tr>
+                        <td>
+                            <a href="{{ url_for('vendors.vendor_detail', vendor_id=v.id) }}" class="fw-bold">
+                                {{ v.name }}
+                            </a>
+                        </td>
+                        <td>{{ v.contact_name or '—' }}</td>
+                        <td>{{ v.phone or '—' }}</td>
+                        <td class="text-end fw-bold">{{ v.total_spent()|currency }}</td>
+                        <td class="text-center">{{ v.expense_count() }}</td>
+                        <td>
+                            <a href="{{ url_for('expenses.expense_quick_add') }}" class="btn btn-sm btn-outline-secondary">
+                                <i class="bi bi-plus"></i> Expense
+                            </a>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6">
+                            <div class="empty-state">
+                                <i class="bi bi-shop"></i>
+                                <h5>No vendors found</h5>
+                                <p>Try adjusting your search or add a new vendor.</p>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <div class="card-footer d-flex justify-content-between">
+        <span class="text-muted small">{{ vendors|length }} vendor(s)</span>
+    </div>
+</div>
+{% endblock %}

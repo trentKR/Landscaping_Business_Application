@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% block title %}Expense Detail - Clips Admin{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <h1>
+        <i class="bi bi-cash-coin"></i> Expense Detail
+        {% if expense.is_refund %}
+        <span class="badge badge-refund">Refund</span>
+        {% endif %}
+    </h1>
+    <div class="d-flex gap-2">
+        <a href="{{ url_for('expenses.expense_edit', expense_id=expense.id) }}" class="btn btn-outline-secondary">
+            <i class="bi bi-pencil"></i> Edit
+        </a>
+        <form method="POST" action="{{ url_for('expenses.expense_delete', expense_id=expense.id) }}"
+              onsubmit="return confirm('Are you sure you want to delete this expense? This cannot be undone.')">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-outline-danger">
+                <i class="bi bi-trash"></i> Delete
+            </button>
+        </form>
+    </div>
+</div>
+
+<div class="row g-3">
+    <div class="col-lg-8">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <div class="detail-label">DATE</div>
+                        <div class="fw-bold">{{ expense.expense_date.strftime('%B %d, %Y') }}</div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="detail-label">AMOUNT</div>
+                        <div class="fw-bold fs-4 {% if expense.is_refund %}text-success{% endif %}">
+                            {% if expense.is_refund %}-{% endif %}{{ expense.amount|currency }}
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="detail-label">PAYMENT METHOD</div>
+                        <div class="fw-bold">{{ expense.method_display }}</div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="detail-label">CATEGORY</div>
+                        <div><span class="badge badge-category">{{ expense.category.name }}</span></div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="detail-label">VENDOR</div>
+                        <div class="fw-bold">
+                            {% if expense.vendor %}
+                            <a href="{{ url_for('vendors.vendor_detail', vendor_id=expense.vendor_id) }}">{{ expense.vendor.name }}</a>
+                            {% else %}
+                            —
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="detail-label">RECORDED</div>
+                        <div>{{ expense.created_at|eastern }}</div>
+                    </div>
+                    {% if expense.description %}
+                    <div class="col-12">
+                        <div class="detail-label">DESCRIPTION</div>
+                        <div>{{ expense.description }}</div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        {% if expense.is_split %}
+        <div class="card shadow-sm mb-3">
+            <div class="card-header bg-white fw-bold">
+                <i class="bi bi-people"></i> Client Allocations
+            </div>
+            <div class="card-body p-0">
+                <table class="table table-sm mb-0">
+                    <thead>
+                        <tr>
+                            <th>Client</th>
+                            <th class="text-end">Amount</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for a in expense.allocations %}
+                        <tr>
+                            <td>
+                                <a href="{{ url_for('clients.client_detail', client_id=a.client_id) }}">{{ a.client.full_name }}</a>
+                            </td>
+                            <td class="text-end">{{ a.amount|currency }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr class="table-light">
+                            <td class="fw-bold">Total Allocated</td>
+                            <td class="text-end fw-bold">{{ expense.allocated_amount|currency }}</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+        {% elif expense.client %}
+        <div class="card shadow-sm mb-3">
+            <div class="card-header bg-white fw-bold">
+                <i class="bi bi-person"></i> Linked Client
+            </div>
+            <div class="card-body">
+                <a href="{{ url_for('clients.client_detail', client_id=expense.client_id) }}" class="fw-bold">
+                    {{ expense.client.full_name }}
+                </a>
+                <div class="detail-label">{{ expense.client.full_address }}</div>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if expense.service %}
+        <div class="card shadow-sm">
+            <div class="card-header bg-white fw-bold">
+                <i class="bi bi-clipboard-check"></i> Linked Service
+            </div>
+            <div class="card-body">
+                <div class="fw-bold">{{ expense.service.service_type_display }}</div>
+                <div class="detail-label">{{ expense.service.service_date.strftime('%m/%d/%Y') }}</div>
+                <div>{{ expense.service.amount|currency }}</div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

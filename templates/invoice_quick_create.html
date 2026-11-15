@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+{% block title %}Quick Invoice - Clips Admin{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <h1><i class="bi bi-receipt"></i> Create Invoice</h1>
+</div>
+
+<ul class="nav nav-tabs mb-3" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="quick-tab" data-bs-toggle="tab"
+                data-bs-target="#quickPane" type="button" role="tab">
+            <i class="bi bi-lightning-fill"></i> Quick Invoice
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="custom-tab" data-bs-toggle="tab"
+                data-bs-target="#customPane" type="button" role="tab">
+            <i class="bi bi-receipt-cutoff"></i> Custom Invoice
+        </button>
+    </li>
+</ul>
+
+<div class="tab-content">
+    <div class="tab-pane fade show active" id="quickPane" role="tabpanel">
+
+<form method="POST">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="row g-3 mb-3">
+        <div class="col-md-3">
+            <label for="route_filter" class="form-label">Route</label>
+            <select class="form-select" id="route_filter" onchange="filterByRoute(this.value)">
+                <option value="all">All Clients</option>
+                {% for r in routes %}
+                <option value="{{ r.id }}">{{ r.name }}</option>
+                {% endfor %}
+                <option value="none">Unassigned</option>
+            </select>
+        </div>
+        <div class="col-md-9 d-flex align-items-end gap-2">
+            <button type="button" class="btn btn-outline-secondary btn-select-all" onclick="toggleAll(true)">
+                <i class="bi bi-check-all"></i> Select All
+            </button>
+            <button type="button" class="btn btn-outline-secondary btn-select-all" onclick="toggleAll(false)">
+                <i class="bi bi-x-lg"></i> Deselect All
+            </button>
+        </div>
+    </div>
+
+    <div class="card shadow-sm mb-3">
+        <div class="card-body p-0">
+            {% for client, services in clients_with_services %}
+            <div class="quick-add-row d-flex align-items-center px-3" id="row_{{ client.id }}" data-route="{{ client.route_id or 'none' }}">
+                <div class="form-check flex-grow-1 py-2">
+                    <input class="form-check-input client-check" type="checkbox"
+                           id="check_{{ client.id }}" name="client_ids" value="{{ client.id }}"
+                           onchange="toggleRow({{ client.id }})">
+                    <label class="form-check-label w-100" for="check_{{ client.id }}">
+                        <strong>{{ client.full_name }}</strong>
+                        <span class="text-muted ms-2 d-none d-md-inline">{{ client.full_address }}</span>
+                        <span class="badge badge-category ms-2">{{ services|length }} service{{ 's' if services|length != 1 else '' }}</span>
+                        <span class="badge badge-paid ms-1">${{ "%.2f"|format(services|sum(attribute='amount')) }}</span>
+                        {% if not client.email %}
+                        <span class="badge badge-partial ms-1"><i class="bi bi-envelope-slash"></i> no email</span>
+                        {% endif %}
+                    </label>
+                </div>
+            </div>
+            {% else %}
+            <div class="p-4 text-center text-muted">
+                No clients have uninvoiced services. <a href="{{ url_for('services_bp.service_quick_add') }}">Add services</a> first.
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    {% if clients_with_services %}
+    <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-green"
+                onclick="event.preventDefault(); this.disabled=true; this.innerHTML='<i class=\'bi bi-hourglass-split\'></i> Creating Invoices\u2026'; this.form.submit();">
+            <i class="bi bi-lightning-fill"></i> Create Invoices &amp; Send Emails
+        </button>
+        <a href="{{ url_for('invoices.invoice_list') }}" class="btn btn-outline-secondary">Cancel</a>
+    </div>
+    {% endif %}
+</form>
+
+    </div>
+
+    <div class="tab-pane fade" id="customPane" role="tabpanel">
+        <div class="card shadow-sm">
+            <div class="card-body text-center py-5">
+                <i class="bi bi-receipt-cutoff display-4 text-muted"></i>
+                <h5 class="mt-3">Custom Invoice</h5>
+                <p class="text-muted">Create an invoice for a single client with custom line items.</p>
+                <a href="{{ url_for('invoices.invoice_create') }}" class="btn btn-green">
+                    <i class="bi bi-plus-circle"></i> Create Custom Invoice
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggleRow(clientId) {
+    const cb = document.getElementById('check_' + clientId);
+    const row = document.getElementById('row_' + clientId);
+    if (cb.checked) {
+        row.classList.add('checked');
+    } else {
+        row.classList.remove('checked');
+    }
+}
+
+function toggleAll(state) {
+    document.querySelectorAll('.quick-add-row').forEach(function(row) {
+        if (row.style.display === 'none') return;
+        const cb = row.querySelector('.client-check');
+        if (!cb) return;
+        cb.checked = state;
+        if (state) {
+            row.classList.add('checked');
+        } else {
+            row.classList.remove('checked');
+        }
+    });
+}
+
+function filterByRoute(value) {
+    document.querySelectorAll('.quick-add-row').forEach(function(row) {
+        const routeId = row.getAttribute('data-route');
+        if (value === 'all') {
+            row.style.display = '';
+        } else if (value === 'none') {
+            row.style.display = (routeId === 'none' || !routeId) ? '' : 'none';
+        } else {
+            row.style.display = (routeId === value) ? '' : 'none';
+        }
+        if (row.style.display === 'none') {
+            const cb = row.querySelector('.client-check');
+            if (cb) { cb.checked = false; }
+            row.classList.remove('checked');
+        }
+    });
+}
+</script>
+{% endblock %}

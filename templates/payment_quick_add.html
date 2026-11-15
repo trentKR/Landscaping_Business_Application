@@ -1,0 +1,335 @@
+{% extends "base.html" %}
+{% block title %}Quick Add Payments - Clips Admin{% endblock %}
+
+{#- One definition of a grid row, rendered twice: for the initial blank rows,
+    and into <template> with a placeholder index the JS swaps out. Never do
+    arithmetic on idx in here — it may be the string '__INDEX__'. -#}
+{% macro payment_row(idx) %}
+<tr class="payment-row">
+    <td data-label="Date">
+        {# Must be inside a <td>: a bare input under <tr> gets foster-parented
+           out of the table by the HTML parser and detaches from the row. #}
+        <input type="hidden" name="row_index" value="{{ idx }}">
+        <input type="date" class="form-control form-control-sm"
+               name="payment_date_{{ idx }}" data-field="payment_date"
+               value="{{ today.isoformat() }}">
+        <div class="invalid-feedback"></div>
+    </td>
+    <td data-label="Client">
+        {# Sorted by last name, so the options read "Last, First" — that is what
+           makes the browser's native type-ahead match the order on screen when
+           working through a stack of checks. #}
+        <select class="form-select form-select-sm" name="client_id_{{ idx }}" data-field="client_id">
+            <option value="">Client...</option>
+            {% for c in clients %}
+            <option value="{{ c.id }}" data-balance="{{ balances.get(c.id, 0) }}">{{ c.last_name }}, {{ c.first_name }}</option>
+            {% endfor %}
+        </select>
+        <div class="invalid-feedback"></div>
+        <div class="grid-hint"></div>
+    </td>
+    <td data-label="Amount">
+        <div class="input-group input-group-sm">
+            <span class="input-group-text">$</span>
+            <input type="number" class="form-control text-end" name="amount_{{ idx }}"
+                   data-field="amount" step="0.01" min="0" placeholder="0.00" inputmode="decimal">
+            <div class="invalid-feedback"></div>
+        </div>
+    </td>
+    <td data-label="Method">
+        <select class="form-select form-select-sm" name="payment_method_{{ idx }}" data-field="payment_method">
+            {% for val, label in payment_methods %}
+            <option value="{{ val }}" {% if val == 'check' %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+        </select>
+    </td>
+    <td data-label="Reference">
+        <input type="text" class="form-control form-control-sm" name="reference_{{ idx }}"
+               data-field="reference" maxlength="100" placeholder="e.g. Check #1234">
+    </td>
+    <td data-label="Notes">
+        <input type="text" class="form-control form-control-sm" name="notes_{{ idx }}"
+               data-field="notes" maxlength="250" placeholder="Optional">
+    </td>
+    <td class="td-remove" data-label="">
+        <button type="button" class="btn btn-sm btn-outline-danger remove-row" aria-label="Remove row">&times;</button>
+    </td>
+</tr>
+{% endmacro %}
+
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <h1><i class="bi bi-lightning-fill"></i> Quick Add Payments</h1>
+</div>
+<p class="text-muted small mb-3">Record payments — a new row appears as you fill in the last one. Each is applied to the client's oldest unpaid invoices first (FIFO).</p>
+
+{# novalidate: the trailing blank row must always be allowed through, so no
+   control can carry `required`. All validation and messaging is ours. #}
+<form method="POST" id="quickAddForm" novalidate>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    <div class="alert alert-danger d-none" id="gridError" role="alert">
+        <i class="bi bi-exclamation-triangle-fill"></i> <span id="gridErrorText"></span>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0 quick-grid" style="min-width:960px">
+                    <thead>
+                        <tr>
+                            <th style="width:140px">Date</th>
+                            <th style="width:210px">Client</th>
+                            <th style="width:120px">Amount</th>
+                            <th style="width:130px">Method</th>
+                            <th style="width:150px">Reference</th>
+                            <th>Notes</th>
+                            <th style="width:40px"></th>
+                        </tr>
+                    </thead>
+                    <tbody id="paymentRows">
+                        {% for i in range(blank_rows) %}{{ payment_row(i) }}{% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td colspan="2" class="text-end">Total</td>
+                            <td class="text-end" id="gridTotal">$0.00</td>
+                            <td colspan="4"></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+        <div class="card-footer d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <button type="button" class="btn btn-sm btn-outline-secondary" id="addRowBtn">
+                <i class="bi bi-plus"></i> Add Row
+            </button>
+            <span class="text-muted small"><span id="filledCount">0</span> payment(s) ready to save</span>
+        </div>
+    </div>
+
+    <div class="d-flex gap-2 mt-3">
+        <button type="submit" class="btn btn-green" id="saveBtn">
+            <i class="bi bi-check-lg"></i> Save All Payments
+        </button>
+        <a href="{{ url_for('payments.payment_list') }}" class="btn btn-outline-secondary">Cancel</a>
+    </div>
+</form>
+
+<template id="rowTemplate">{{ payment_row('__INDEX__') }}</template>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+    const form      = document.getElementById('quickAddForm');
+    const tbody     = document.getElementById('paymentRows');
+    const tpl       = document.getElementById('rowTemplate');
+    const saveBtn   = document.getElementById('saveBtn');
+    const errBox    = document.getElementById('gridError');
+    const errText   = document.getElementById('gridErrorText');
+    const totalCell = document.getElementById('gridTotal');
+    const countCell = document.getElementById('filledCount');
+    const MAX_ROWS  = {{ max_rows }};
+    const TOLERANCE = 0.005;             // matches PAYMENT_TOLERANCE server-side
+    let nextIndex   = {{ blank_rows }};
+    let submitting  = false;
+
+    const field = (tr, name) => tr.querySelector('[data-field="' + name + '"]');
+
+    // Keep in lockstep with the blank-row test in payments.payment_quick_add.
+    const MEANINGFUL = ['client_id', 'amount', 'reference', 'notes'];
+    function rowIsBlank(tr) {
+        return MEANINGFUL.every(function (f) {
+            const el = field(tr, f);
+            return !el || !el.value.trim();
+        });
+    }
+
+    // ---- rows -------------------------------------------------------------
+    function addRow(inheritFrom) {
+        if (tbody.children.length >= MAX_ROWS) return null;
+        // Safe use of insertAdjacentHTML: the markup is the server-rendered
+        // <template>, which Jinja auto-escapes, and the only substitution is an
+        // integer counter. Never interpolate user input into this string —
+        // build such rows with createElement + textContent instead.
+        tbody.insertAdjacentHTML('beforeend',
+            tpl.innerHTML.replace(/__INDEX__/g, nextIndex++));
+        const tr = tbody.lastElementChild;
+        if (inheritFrom) {
+            // Date and method are sticky context when working through one day's
+            // deposit. What identifies the payment is deliberately not copied.
+            field(tr, 'payment_date').value   = field(inheritFrom, 'payment_date').value;
+            field(tr, 'payment_method').value = field(inheritFrom, 'payment_method').value;
+        }
+        return tr;
+    }
+
+    function clearRow(tr) {
+        field(tr, 'client_id').value = '';
+        field(tr, 'amount').value = '';
+        field(tr, 'reference').value = '';
+        field(tr, 'notes').value = '';
+        applyClientContext(tr);
+        tr.querySelectorAll('.is-invalid').forEach(el => el.classList.remove('is-invalid'));
+    }
+
+    function ensureTrailingBlank() {
+        const last = tbody.lastElementChild;
+        if (!last || !rowIsBlank(last)) addRow(last);
+    }
+
+    // ---- client context ---------------------------------------------------
+    // Balance rides along on each <option> as data-balance, so picking a client
+    // costs no round-trip. Same idiom as the mowing-rate autofill in
+    // service_form.html.
+    function applyClientContext(tr) {
+        const sel  = field(tr, 'client_id');
+        const amt  = field(tr, 'amount');
+        const hint = tr.querySelector('.grid-hint');
+        const opt  = sel.selectedOptions[0];
+        const bal  = opt ? parseFloat(opt.dataset.balance) : NaN;
+
+        if (!sel.value || !isFinite(bal)) {
+            hint.textContent = '';
+            hint.className = 'grid-hint';
+            return;
+        }
+        if (bal > TOLERANCE) {
+            hint.textContent = 'Owes ' + money(bal);
+            hint.className = 'grid-hint text-danger';
+            // The balance is overwhelmingly what gets typed next, but never
+            // clobber an amount the user already entered.
+            if (!amt.value.trim()) amt.value = bal.toFixed(2);
+        } else if (bal < -TOLERANCE) {
+            hint.textContent = 'Credit ' + money(-bal);
+            hint.className = 'grid-hint text-success';
+        } else {
+            hint.textContent = 'Settled up';
+            hint.className = 'grid-hint';
+        }
+    }
+
+    // ---- totals -----------------------------------------------------------
+    function money(n) {
+        return (n < 0 ? '-$' : '$') + Math.abs(n)
+            .toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    }
+
+    function updateTotals() {
+        let total = 0, count = 0;
+        tbody.querySelectorAll('tr').forEach(function (tr) {
+            if (rowIsBlank(tr)) return;
+            count++;
+            total += parseFloat(field(tr, 'amount').value) || 0;
+        });
+        totalCell.textContent = money(total);
+        countCell.textContent = count;
+    }
+
+    // ---- delegated events (appended rows need no wiring) ------------------
+    function onEdit(e) {
+        const tr = e.target.closest('tr');
+        if (!tr) return;
+        e.target.classList.remove('is-invalid');   // clear as the user fixes it
+        if (e.target.matches('[data-field="client_id"]')) applyClientContext(tr);
+        // Auto-append: only from the last row, only once it stops being blank.
+        // No flag needed — after appending, this row is no longer lastElementChild,
+        // so the same row can never trigger a second append.
+        if (tr === tbody.lastElementChild && !rowIsBlank(tr)) addRow(tr);
+        updateTotals();
+    }
+    tbody.addEventListener('input', onEdit);
+    tbody.addEventListener('change', onEdit);   // selects
+
+    tbody.addEventListener('click', function (e) {
+        const btn = e.target.closest('.remove-row');
+        if (!btn) return;
+        const tr = btn.closest('tr');
+        if (tbody.children.length === 1) {
+            clearRow(tr);            // never leave an empty grid
+        } else {
+            tr.remove();             // the row's hidden row_index goes with it
+        }
+        ensureTrailingBlank();
+        updateTotals();
+    });
+
+    // A scroll wheel over a focused number input silently rewrites amounts.
+    tbody.addEventListener('wheel', function (e) {
+        if (e.target.matches('input[type="number"]:focus')) e.target.blur();
+    }, {passive: true});
+
+    document.getElementById('addRowBtn').addEventListener('click', function () {
+        const tr = addRow(tbody.lastElementChild);
+        if (tr) field(tr, 'client_id').focus();
+    });
+
+    // ---- validation -------------------------------------------------------
+    function markInvalid(el, msg) {
+        el.classList.add('is-invalid');
+        const fb = el.parentElement.querySelector('.invalid-feedback');
+        if (fb) fb.textContent = msg;
+    }
+
+    function validateRow(tr) {
+        const bad = [];
+        const d = field(tr, 'payment_date');
+        if (!d.value) { markInvalid(d, 'Required.'); bad.push(d); }
+
+        const c = field(tr, 'client_id');
+        if (!c.value) { markInvalid(c, 'Required.'); bad.push(c); }
+
+        const a = field(tr, 'amount');
+        const n = parseFloat(a.value);
+        if (!a.value.trim())   { markInvalid(a, 'Required.');        bad.push(a); }
+        else if (!isFinite(n)) { markInvalid(a, 'Not a number.');    bad.push(a); }
+        else if (n <= 0)       { markInvalid(a, 'Must be over $0.'); bad.push(a); }
+
+        return bad;
+    }
+
+    form.addEventListener('submit', function (e) {
+        if (submitting) { e.preventDefault(); return; }
+
+        errBox.classList.add('d-none');
+        tbody.querySelectorAll('.is-invalid').forEach(el => el.classList.remove('is-invalid'));
+
+        let firstBad = null, badRows = 0, realRows = 0;
+        tbody.querySelectorAll('tr').forEach(function (tr) {
+            if (rowIsBlank(tr)) return;
+            realRows++;
+            const bad = validateRow(tr);
+            if (bad.length) {
+                badRows++;
+                if (!firstBad) firstBad = bad[0];
+            }
+        });
+
+        if (realRows === 0) {
+            e.preventDefault();
+            errText.textContent = 'Enter at least one payment before saving.';
+            errBox.classList.remove('d-none');
+            errBox.scrollIntoView({block: 'center', behavior: 'smooth'});
+            return;
+        }
+        if (firstBad) {
+            e.preventDefault();
+            errText.textContent = badRows + ' row(s) need attention — fix the highlighted fields and try again.';
+            errBox.classList.remove('d-none');
+            firstBad.scrollIntoView({block: 'center', behavior: 'smooth'});
+            firstBad.focus({preventScroll: true});
+            return;
+        }
+
+        // Only after validation passes, so a rejected submit never leaves a
+        // dead button. 25 rows posted twice is a painful cleanup.
+        submitting = true;
+        saveBtn.disabled = true;
+        saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Saving...';
+    });
+
+    updateTotals();
+})();
+</script>
+{% endblock %}

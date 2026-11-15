@@ -1,0 +1,242 @@
+{% extends "base.html" %}
+{% block title %}{{ invoice.invoice_number }} - Clips Admin{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <h1>
+        <i class="bi bi-receipt"></i> {{ invoice.invoice_number }}
+        <span class="badge {{ invoice.status_class }} badge-lg">{{ invoice.status_display }}</span>
+    </h1>
+    <div class="d-flex gap-2 flex-wrap">
+        {% if invoice.status != 'void' %}
+        <a href="{{ url_for('payments.payment_quick_add') }}" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-cash"></i> Record Payment
+        </a>
+        <form method="POST" action="{{ url_for('invoices.invoice_void', invoice_id=invoice.id) }}" class="d-inline">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-outline-warning btn-sm" onclick="return confirm('Are you sure you want to void this invoice? Payment applications will be freed.')">
+                <i class="bi bi-x-circle"></i> Void
+            </button>
+        </form>
+        {% endif %}
+        {% if invoice.status == 'void' %}
+        <form method="POST" action="{{ url_for('invoices.invoice_delete', invoice_id=invoice.id) }}" class="d-inline">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-outline-danger btn-sm"
+                onclick="return confirm('Permanently delete {{ invoice.invoice_number }}? This cannot be undone.')">
+                <i class="bi bi-trash"></i> Delete Invoice
+            </button>
+        </form>
+        {% endif %}
+        <a href="{{ url_for('invoices.invoice_print', invoice_id=invoice.id) }}" class="btn btn-outline-secondary btn-sm" target="_blank">
+            <i class="bi bi-printer"></i> Print
+        </a>
+        {% if invoice.client.email %}
+        <form method="POST" action="{{ url_for('invoices.invoice_email', invoice_id=invoice.id) }}" class="d-inline">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-outline-primary btn-sm"
+                onclick="event.preventDefault(); this.disabled=true; this.innerHTML='<i class=&quot;bi bi-hourglass-split&quot;></i> Sending\u2026'; this.form.submit();">
+                <i class="bi bi-envelope"></i> Email Invoice
+            </button>
+        </form>
+        {% else %}
+        <button type="button" class="btn btn-outline-primary btn-sm" disabled
+            title="Client has no email address">
+            <i class="bi bi-envelope"></i> Email Invoice
+        </button>
+        {% endif %}
+        <a href="{{ url_for('invoices.invoice_list') }}" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-left"></i> Back to Invoices
+        </a>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <!-- Invoice summary -->
+    <div class="col-md-6">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-white fw-bold">Invoice Details</div>
+            <div class="card-body">
+                <table class="table table-borderless mb-0">
+                    <tr>
+                        <td class="text-muted" style="width:130px">Client</td>
+                        <td>
+                            <a href="{{ url_for('clients.client_detail', client_id=invoice.client_id) }}">
+                                {{ invoice.client.full_name }}
+                            </a>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted">Invoice Date</td>
+                        <td>{{ invoice.invoice_date.strftime('%B %d, %Y') }}</td>
+                    </tr>
+                    {% if invoice.sent_at %}
+                    <tr>
+                        <td class="text-muted">Sent</td>
+                        <td>{{ invoice.sent_at|eastern }}</td>
+                    </tr>
+                    {% endif %}
+                    {% if invoice.paid_at %}
+                    <tr>
+                        <td class="text-muted">Paid</td>
+                        <td>{{ invoice.paid_at|eastern }}</td>
+                    </tr>
+                    {% endif %}
+                    {% if invoice.voided_at %}
+                    <tr>
+                        <td class="text-muted">Voided</td>
+                        <td>{{ invoice.voided_at|eastern }}</td>
+                    </tr>
+                    {% endif %}
+                    {% if invoice.notes %}
+                    <tr>
+                        <td class="text-muted">Notes</td>
+                        <td>{{ invoice.notes }}</td>
+                    </tr>
+                    {% endif %}
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Totals -->
+    <div class="col-md-6">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-white fw-bold">Balance</div>
+            <div class="card-body">
+                <div class="d-flex justify-content-between mb-2">
+                    <span>Invoice Total</span>
+                    <strong>{{ invoice.subtotal|currency }}</strong>
+                </div>
+                {% if invoice.status == 'paid' %}
+                <hr>
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="fw-bold text-success"><i class="bi bi-check-circle-fill"></i> Paid in Full</span>
+                </div>
+                {% else %}
+                <div class="d-flex justify-content-between mb-2">
+                    <span>Payments Received</span>
+                    <strong class="text-success">{{ invoice.amount_paid|currency }}</strong>
+                </div>
+                {% if outstanding %}
+                <div class="mb-2">
+                    <span class="text-muted small fw-semibold">Outstanding Invoices</span>
+                    {% for number, amount in outstanding %}
+                    <div class="d-flex justify-content-between">
+                        <span class="text-muted small">{{ number }}</span>
+                        <span class="small">{{ amount|currency }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+                <hr>
+                <div class="d-flex justify-content-between">
+                    <span class="fw-bold">Account Balance</span>
+                    <span class="stat-value {% if invoice.client.account_balance() > 0 %}text-danger{% else %}text-success{% endif %}">
+                        {{ invoice.client.account_balance()|currency }}
+                    </span>
+                </div>
+                <div class="text-muted small">as of {{ today.strftime('%B') }} {{ today.day }}, {{ today.year }}</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Line items -->
+<div class="card shadow-sm mb-4">
+    <div class="card-header bg-white fw-bold">
+        <i class="bi bi-list-ul"></i> Line Items
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Description</th>
+                        <th class="text-end">Amount</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for li in invoice.line_items %}
+                    <tr>
+                        <td>{{ li.description }}</td>
+                        <td class="text-end fw-bold">{{ li.amount|currency }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr class="table-light">
+                        <td class="fw-bold text-end">Subtotal</td>
+                        <td class="text-end fw-bold">{{ invoice.subtotal|currency }}</td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Payments applied -->
+{% if invoice.payment_applications %}
+<div class="card shadow-sm">
+    <div class="card-header bg-white fw-bold">
+        <i class="bi bi-cash-stack"></i> Payments Applied
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Payment Method</th>
+                        <th>Reference</th>
+                        <th class="text-end">Applied</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for pa in invoice.payment_applications %}
+                    <tr>
+                        <td>
+                            <a href="{{ url_for('payments.payment_detail', payment_id=pa.payment_id) }}">
+                                {{ pa.payment.payment_date.strftime('%m/%d/%Y') }}
+                            </a>
+                        </td>
+                        <td>{{ pa.payment.method_display }}</td>
+                        <td class="text-muted">{{ pa.payment.reference or '&mdash;'|safe }}</td>
+                        <td class="text-end fw-bold text-success">{{ pa.amount_applied|currency }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Ways to Pay -->
+<div class="card shadow-sm mt-4">
+    <div class="card-header bg-white fw-bold">
+        <i class="bi bi-wallet2"></i> Ways to Pay
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-sm-6 col-lg-3 mb-2">
+                <small class="text-muted d-block">Check</small>
+                <strong>{{ config.PAYMENT_NAME }}</strong>
+            </div>
+            <div class="col-sm-6 col-lg-3 mb-2">
+                <small class="text-muted d-block">Venmo</small>
+                <strong>{{ config.VENMO_HANDLE }}</strong>
+            </div>
+            <div class="col-sm-6 col-lg-3 mb-2">
+                <small class="text-muted d-block">Cash App</small>
+                <strong>{{ config.CASHAPP_HANDLE }}</strong>
+            </div>
+            <div class="col-sm-6 col-lg-3 mb-2">
+                <small class="text-muted d-block">Zelle</small>
+                <strong>{{ config.ZELLE_PHONE }}</strong>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

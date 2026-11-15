@@ -1,0 +1,18 @@
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+filterwarnings = [
+    # Flask-Limiter warns about the in-memory storage on every app it initialises.
+    "ignore::UserWarning:flask_limiter",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+extend-exclude = ["venv", "instance"]
+
+[tool.ruff.lint]
+# Correctness (F), the pycodestyle subset that flags real errors (E4/E7/E9),
+# import ordering (I) and common bug patterns (B). Style-only rules are left
+# out so CI fails for defects, not taste.
+select = ["E4", "E7", "E9", "F", "I", "B"]

@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html>
+<body style="font-family: Arial, sans-serif; color: #1a1a1a; font-size: 14px; line-height: 1.6;">
+    <p>Hi {{ employee.first_name }},</p>
+    <p>You've been invited to the Clips employee portal. Use the button below to set up your password and start logging your timesheets:</p>
+    <p style="margin: 1.5rem 0;">
+        <a href="{{ setup_url }}" style="display:inline-block;padding:12px 24px;background:#16a34a;color:#fff;text-decoration:none;border-radius:8px;font-weight:600;">Set Up Your Password</a>
+    </p>
+    <p>From the portal you can submit your daily hours and track your pay.</p>
+    <p style="margin: 14px 0 0 0; font-size: 12px; color: #4b5563;">
+        Bookmark <a href="{{ login_url }}" style="color: #16a34a; text-decoration: none; font-weight: 600;">{{ login_url }}</a> &mdash; your portal is always one click away.
+    </p>
+    <p style="font-size: 13px; color: #6b7280;">This link expires in 7 days. If you didn't expect this, you can safely ignore this email.</p>
+    <p style="margin-top: 2rem; font-size: 12px; color: #9ca3af;">Clips by Rorabaugh, LLC</p>
+</body>
+</html>

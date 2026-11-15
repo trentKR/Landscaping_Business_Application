@@ -1,0 +1,307 @@
+{% extends "base.html" %}
+{% block title %}Quick Add Expenses - Clips Admin{% endblock %}
+
+{#- One definition of a grid row, rendered twice: for the initial blank rows,
+    and into <template> with a placeholder index the JS swaps out. Never do
+    arithmetic on idx in here — it may be the string '__INDEX__'. -#}
+{% macro expense_row(idx) %}
+<tr class="expense-row">
+    <td data-label="Date">
+        {# Must be inside a <td>: a bare input under <tr> gets foster-parented
+           out of the table by the HTML parser and detaches from the row. #}
+        <input type="hidden" name="row_index" value="{{ idx }}">
+        <input type="date" class="form-control form-control-sm"
+               name="expense_date_{{ idx }}" data-field="expense_date"
+               value="{{ today.isoformat() }}">
+        <div class="invalid-feedback"></div>
+    </td>
+    <td data-label="Amount">
+        <div class="input-group input-group-sm">
+            <span class="input-group-text">$</span>
+            <input type="number" class="form-control text-end" name="amount_{{ idx }}"
+                   data-field="amount" step="0.01" min="0" placeholder="0.00" inputmode="decimal">
+            <div class="invalid-feedback"></div>
+        </div>
+    </td>
+    <td data-label="Method">
+        <select class="form-select form-select-sm" name="payment_method_{{ idx }}" data-field="payment_method">
+            {% for val, label in payment_methods %}
+            <option value="{{ val }}" {% if val == 'credit_card' %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+        </select>
+    </td>
+    <td data-label="Category">
+        <select class="form-select form-select-sm" name="category_id_{{ idx }}" data-field="category_id">
+            <option value="">Category...</option>
+            {% for cat in categories %}<option value="{{ cat.id }}">{{ cat.name }}</option>{% endfor %}
+        </select>
+        <div class="invalid-feedback"></div>
+    </td>
+    <td data-label="Vendor">
+        <select class="form-select form-select-sm" name="vendor_id_{{ idx }}" data-field="vendor_id">
+            <option value="">No vendor</option>
+            {% for v in vendors %}<option value="{{ v.id }}">{{ v.name }}</option>{% endfor %}
+        </select>
+    </td>
+    <td data-label="Description">
+        <input type="text" class="form-control form-control-sm" name="description_{{ idx }}"
+               data-field="description" maxlength="250" placeholder="Optional">
+    </td>
+    <td class="text-center td-refund" data-label="Refund">
+        <input class="form-check-input" type="checkbox" name="is_refund_{{ idx }}"
+               data-field="is_refund" value="1" aria-label="Mark as refund">
+    </td>
+    <td class="td-remove" data-label="">
+        <button type="button" class="btn btn-sm btn-outline-danger remove-row" aria-label="Remove row">&times;</button>
+    </td>
+</tr>
+{% endmacro %}
+
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <h1><i class="bi bi-lightning-fill"></i> Quick Add Expenses</h1>
+</div>
+<p class="text-muted small mb-3">Enter receipts — a new row appears as you fill in the last one.</p>
+
+{# novalidate: the trailing blank row must always be allowed through, so no
+   control can carry `required`. All validation and messaging is ours. #}
+<form method="POST" id="quickAddForm" novalidate>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    <div class="alert alert-danger d-none" id="gridError" role="alert">
+        <i class="bi bi-exclamation-triangle-fill"></i> <span id="gridErrorText"></span>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0 align-middle quick-grid" style="min-width:920px">
+                    <thead>
+                        <tr>
+                            <th style="width:140px">Date</th>
+                            <th style="width:120px">Amount</th>
+                            <th style="width:130px">Payment Method</th>
+                            <th style="width:160px">Category</th>
+                            <th style="width:150px">Vendor</th>
+                            <th>Description</th>
+                            <th class="text-center" style="width:70px">Refund</th>
+                            <th style="width:40px"></th>
+                        </tr>
+                    </thead>
+                    <tbody id="expenseRows">
+                        {% for i in range(blank_rows) %}{{ expense_row(i) }}{% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td class="text-end">Total</td>
+                            <td class="text-end" id="gridTotal">$0.00</td>
+                            <td colspan="6"></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+        <div class="card-footer d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <button type="button" class="btn btn-sm btn-outline-secondary" id="addRowBtn">
+                <i class="bi bi-plus"></i> Add Row
+            </button>
+            <span class="text-muted small"><span id="filledCount">0</span> expense(s) ready to save</span>
+        </div>
+    </div>
+
+    <div class="d-flex gap-2 mt-3">
+        <button type="submit" class="btn btn-green" id="saveBtn">
+            <i class="bi bi-check-lg"></i> Save All Expenses
+        </button>
+        <a href="{{ url_for('expenses.expense_list') }}" class="btn btn-outline-secondary">Cancel</a>
+    </div>
+</form>
+
+<template id="rowTemplate">{{ expense_row('__INDEX__') }}</template>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+    const form      = document.getElementById('quickAddForm');
+    const tbody     = document.getElementById('expenseRows');
+    const tpl       = document.getElementById('rowTemplate');
+    const saveBtn   = document.getElementById('saveBtn');
+    const errBox    = document.getElementById('gridError');
+    const errText   = document.getElementById('gridErrorText');
+    const totalCell = document.getElementById('gridTotal');
+    const countCell = document.getElementById('filledCount');
+    const MAX_ROWS  = {{ max_rows }};
+    let nextIndex   = {{ blank_rows }};
+    let submitting  = false;
+
+    const field = (tr, name) => tr.querySelector('[data-field="' + name + '"]');
+
+    // Keep in lockstep with the blank-row test in expenses.expense_quick_add.
+    const MEANINGFUL = ['amount', 'category_id', 'vendor_id', 'description'];
+    function rowIsBlank(tr) {
+        return MEANINGFUL.every(function (f) {
+            const el = field(tr, f);
+            return !el || !el.value.trim();
+        });
+    }
+
+    // ---- rows -------------------------------------------------------------
+    function addRow(inheritFrom) {
+        if (tbody.children.length >= MAX_ROWS) return null;
+        // Safe use of insertAdjacentHTML: the markup is the server-rendered
+        // <template>, which Jinja auto-escapes, and the only substitution is an
+        // integer counter. Never interpolate user input into this string —
+        // build such rows with createElement + textContent instead.
+        tbody.insertAdjacentHTML('beforeend',
+            tpl.innerHTML.replace(/__INDEX__/g, nextIndex++));
+        const tr = tbody.lastElementChild;
+        if (inheritFrom) {
+            // Date and method are sticky context when working through a stack of
+            // receipts. What identifies the expense is deliberately not copied.
+            field(tr, 'expense_date').value   = field(inheritFrom, 'expense_date').value;
+            field(tr, 'payment_method').value = field(inheritFrom, 'payment_method').value;
+        }
+        return tr;
+    }
+
+    function clearRow(tr) {
+        field(tr, 'amount').value = '';
+        field(tr, 'category_id').value = '';
+        field(tr, 'vendor_id').value = '';
+        field(tr, 'description').value = '';
+        field(tr, 'is_refund').checked = false;
+        tr.querySelectorAll('.is-invalid').forEach(el => el.classList.remove('is-invalid'));
+    }
+
+    function ensureTrailingBlank() {
+        const last = tbody.lastElementChild;
+        if (!last || !rowIsBlank(last)) addRow(last);
+    }
+
+    // ---- totals -----------------------------------------------------------
+    function money(n) {
+        return (n < 0 ? '-$' : '$') + Math.abs(n)
+            .toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    }
+
+    function updateTotals() {
+        let total = 0, count = 0;
+        tbody.querySelectorAll('tr').forEach(function (tr) {
+            if (rowIsBlank(tr)) return;
+            count++;
+            // abs() mirrors the model rule: amount is always stored positive,
+            // is_refund is what makes it subtract.
+            const amt = Math.abs(parseFloat(field(tr, 'amount').value) || 0);
+            total += field(tr, 'is_refund').checked ? -amt : amt;
+        });
+        totalCell.textContent = money(total);
+        totalCell.classList.toggle('text-success', total < 0);
+        countCell.textContent = count;
+    }
+
+    // ---- delegated events (appended rows need no wiring) ------------------
+    function onEdit(e) {
+        const tr = e.target.closest('tr');
+        if (!tr) return;
+        e.target.classList.remove('is-invalid');   // clear as the user fixes it
+        // Auto-append: only from the last row, only once it stops being blank.
+        // No flag needed — after appending, this row is no longer lastElementChild,
+        // so the same row can never trigger a second append.
+        if (tr === tbody.lastElementChild && !rowIsBlank(tr)) addRow(tr);
+        updateTotals();
+    }
+    tbody.addEventListener('input', onEdit);
+    tbody.addEventListener('change', onEdit);   // selects + checkbox
+
+    tbody.addEventListener('click', function (e) {
+        const btn = e.target.closest('.remove-row');
+        if (!btn) return;
+        const tr = btn.closest('tr');
+        if (tbody.children.length === 1) {
+            clearRow(tr);            // never leave an empty grid
+        } else {
+            tr.remove();             // the row's hidden row_index goes with it
+        }
+        ensureTrailingBlank();
+        updateTotals();
+    });
+
+    // A scroll wheel over a focused number input silently rewrites amounts.
+    tbody.addEventListener('wheel', function (e) {
+        if (e.target.matches('input[type="number"]:focus')) e.target.blur();
+    }, {passive: true});
+
+    document.getElementById('addRowBtn').addEventListener('click', function () {
+        const tr = addRow(tbody.lastElementChild);
+        if (tr) field(tr, 'amount').focus();
+    });
+
+    // ---- validation -------------------------------------------------------
+    function markInvalid(el, msg) {
+        el.classList.add('is-invalid');
+        const fb = el.parentElement.querySelector('.invalid-feedback');
+        if (fb) fb.textContent = msg;
+    }
+
+    function validateRow(tr) {
+        const bad = [];
+        const d = field(tr, 'expense_date');
+        if (!d.value) { markInvalid(d, 'Required.'); bad.push(d); }
+
+        const a = field(tr, 'amount');
+        const n = parseFloat(a.value);
+        if (!a.value.trim())        { markInvalid(a, 'Required.');        bad.push(a); }
+        else if (!isFinite(n))      { markInvalid(a, 'Not a number.');    bad.push(a); }
+        else if (Math.abs(n) === 0) { markInvalid(a, 'Must be over $0.'); bad.push(a); }
+
+        const c = field(tr, 'category_id');
+        if (!c.value) { markInvalid(c, 'Required.'); bad.push(c); }
+
+        return bad;
+    }
+
+    form.addEventListener('submit', function (e) {
+        if (submitting) { e.preventDefault(); return; }
+
+        errBox.classList.add('d-none');
+        tbody.querySelectorAll('.is-invalid').forEach(el => el.classList.remove('is-invalid'));
+
+        let firstBad = null, badRows = 0, realRows = 0;
+        tbody.querySelectorAll('tr').forEach(function (tr) {
+            if (rowIsBlank(tr)) return;
+            realRows++;
+            const bad = validateRow(tr);
+            if (bad.length) {
+                badRows++;
+                if (!firstBad) firstBad = bad[0];
+            }
+        });
+
+        if (realRows === 0) {
+            e.preventDefault();
+            errText.textContent = 'Enter at least one expense before saving.';
+            errBox.classList.remove('d-none');
+            errBox.scrollIntoView({block: 'center', behavior: 'smooth'});
+            return;
+        }
+        if (firstBad) {
+            e.preventDefault();
+            errText.textContent = badRows + ' row(s) need attention — fix the highlighted fields and try again.';
+            errBox.classList.remove('d-none');
+            firstBad.scrollIntoView({block: 'center', behavior: 'smooth'});
+            firstBad.focus({preventScroll: true});
+            return;
+        }
+
+        // Only after validation passes, so a rejected submit never leaves a
+        // dead button. 25 rows posted twice is a painful cleanup.
+        submitting = true;
+        saveBtn.disabled = true;
+        saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Saving...';
+    });
+
+    updateTotals();
+})();
+</script>
+{% endblock %}

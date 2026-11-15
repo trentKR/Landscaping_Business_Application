@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Clips Landscaping — Lawn Care in Fairlawn, Copley &amp; Bath</title>
+    <meta name="description" content="Weekly mowing, mulching, hedge trimming, and seasonal cleanup across Fairlawn, Copley, and Bath. Locally owned lawn care in the greater Akron area.">
+    <link rel="canonical" href="{{ config.MARKETING_URL }}/">
+    <meta name="theme-color" content="#14532d">
+
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Clips Landscaping">
+    <meta property="og:title" content="Clips Landscaping — Lawn Care in Fairlawn, Copley &amp; Bath">
+    <meta property="og:description" content="Weekly mowing, mulching, trimming, and seasonal cleanup across Fairlawn, Copley, and Bath.">
+    <meta property="og:url" content="{{ config.MARKETING_URL }}/">
+    <meta property="og:image" content="{{ url_for('static', filename='landingPage/golfcourse-1360.webp', _external=True) }}">
+    <meta name="twitter:card" content="summary_large_image">
+
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='Favicon Light Green.png') }}">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@700;800&family=DM+Mono:wght@500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+
+    <link rel="preload" as="image" type="image/webp"
+          href="{{ url_for('static', filename='landingPage/golfcourse-1360.webp') }}"
+          imagesrcset="{{ url_for('static', filename='landingPage/golfcourse-800.webp') }} 800w, {{ url_for('static', filename='landingPage/golfcourse-1360.webp') }} 1360w"
+          imagesizes="(max-width: 1320px) 100vw, 1320px">
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='landing.css') }}">
+
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "LandscapingBusiness",
+      "name": "Clips Landscaping",
+      "legalName": "Clips by Rorabaugh, LLC",
+      "url": "{{ config.MARKETING_URL }}/",
+      "telephone": "{{ config.BUSINESS_PHONE }}",
+      "image": "{{ url_for('static', filename='landingPage/golfcourse-1360.webp', _external=True) }}",
+      "address": { "@type": "PostalAddress", "addressLocality": "Fairlawn", "addressRegion": "OH", "addressCountry": "US" },
+      "areaServed": [
+        { "@type": "City", "name": "Fairlawn, OH" },
+        { "@type": "City", "name": "Copley, OH" },
+        { "@type": "City", "name": "Bath, OH" },
+        { "@type": "City", "name": "Akron, OH" }
+      ],
+      "makesOffer": [
+        { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Weekly lawn mowing" } },
+        { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Mulch installation" } },
+        { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Hedge trimming" } },
+        { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Leaf and seasonal cleanup" } }
+      ]
+    }
+    </script>
+</head>
+<body>
+
+<a href="#main" class="sr-only">Skip to content</a>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    <div class="flash-stack" role="status" aria-live="polite">
+      {% for category, message in messages %}
+        <div class="flash flash--{{ category }}">{{ message }}</div>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endwith %}
+
+<!-- ── Nav ─────────────────────────────────────────────────────────────── -->
+<nav class="nav" id="nav">
+    <div class="shell nav__inner">
+        <a href="{{ url_for('landing.home') }}" class="nav__logo">
+            {# logo.png is the light-on-dark mark used by the admin sidebar; on the
+               cream canvas it disappears, so the nav takes the green variant. #}
+            <img src="{{ url_for('static', filename='logo_green.png') }}" alt="Clips Landscaping" width="60" height="40">
+        </a>
+
+        <button class="nav__toggle" id="navToggle" type="button"
+                aria-expanded="false" aria-controls="navLinks" aria-label="Open menu">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+                <path d="M3 6h18M3 12h18M3 18h18"/>
+            </svg>
+        </button>
+
+        <ul class="nav__links" id="navLinks">
+            <li><a href="#services">Services</a></li>
+            <li><a href="#work">Our work</a></li>
+            <li><a href="#reviews">Reviews</a></li>
+            <li><a href="{{ url_for('portal.portal_login') }}" class="btn btn--ghost btn--sm">Customer login</a></li>
+            <li><a href="#quote" class="btn btn--primary btn--sm">Get a quote</a></li>
+        </ul>
+    </div>
+</nav>
+
+<main id="main">
+
+<!-- ── Hero ────────────────────────────────────────────────────────────── -->
+<section class="hero">
+    <div class="shell">
+        <h1 class="t-display hero__title">A lawn you&rsquo;ll love living on.</h1>
+        <p class="lede hero__lede">
+            Weekly mowing, mulching, trimming, and seasonal cleanup &mdash; with a
+            regular day each week, so you know when to expect us.
+        </p>
+        <div class="hero__actions">
+            <a href="#quote" class="btn btn--primary">Get a quote</a>
+            <a href="tel:+13306203465" class="btn btn--ghost">Call (330) 620-3465</a>
+        </div>
+        <p class="hero__note">Fairlawn &middot; Copley &middot; Bath &middot; Greater Akron</p>
+    </div>
+</section>
+
+<div class="hero__media">
+    <picture>
+        <source type="image/webp"
+                srcset="{{ url_for('static', filename='landingPage/golfcourse-800.webp') }} 800w,
+                        {{ url_for('static', filename='landingPage/golfcourse-1360.webp') }} 1360w"
+                sizes="(max-width: 1320px) 100vw, 1320px">
+        <img src="{{ url_for('static', filename='landingPage/golfcourse.png') }}"
+             alt="A wide, freshly striped lawn with the Clips truck and trailer parked along the drive"
+             width="1360" height="815" fetchpriority="high">
+    </picture>
+</div>
+
+<!-- ── Services ────────────────────────────────────────────────────────── -->
+<section class="band" id="services">
+    <div class="shell">
+        <div class="section-head">
+            <p class="eyebrow">Services</p>
+            <h2 class="t-section">One crew for the whole property.</h2>
+            <p class="lede">Weekly mowing through the season, plus the mulch, trimming, and cleanup that keep the rest of the property in shape.</p>
+        </div>
+
+        <div class="bento">
+            <article class="tile tile--feature">
+                <picture>
+                    <source type="image/webp"
+                            srcset="{{ url_for('static', filename='landingPage/James-640.webp') }} 640w,
+                                    {{ url_for('static', filename='landingPage/James-1120.webp') }} 1120w"
+                            sizes="(max-width: 720px) 100vw, 560px">
+                    <img src="{{ url_for('static', filename='landingPage/James.png') }}"
+                         alt="A Clips crew member with a walk-behind mower on a striped front lawn"
+                         width="1120" height="840" loading="lazy">
+                </picture>
+                <div class="tile__body">
+                    <h3>Weekly mowing</h3>
+                    <p>Cut, trimmed, edged, and the walks blown clean. You&rsquo;ll have a regular day each week.</p>
+                </div>
+            </article>
+
+            <article class="tile tile--feature tile--statement">
+                <div class="tile__body">
+                    <p class="eyebrow">Who shows up</p>
+                    <h3>John is a teacher and a high school coach.</h3>
+                    <p>Clips started as John and his sons. He runs it today with a crew of current and former students &mdash; and many of the lawns they mow have been on the route for years.</p>
+                </div>
+            </article>
+
+            <article class="tile tile--compact">
+                <div class="tile__icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M12 2 2 7l10 5 10-5-10-5Z"/><path d="m2 17 10 5 10-5"/><path d="m2 12 10 5 10-5"/>
+                    </svg>
+                </div>
+                <h3>Mulching</h3>
+                <p>Fresh mulch for beds, trees, and walkways. Holds moisture in and keeps weeds down.</p>
+            </article>
+
+            <article class="tile tile--compact">
+                <div class="tile__icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/>
+                        <path d="M8.12 8.12 20 20"/><path d="M20 4 8.12 15.88"/>
+                    </svg>
+                </div>
+                <h3>Hedge trimming</h3>
+                <p>Shaping for hedges, bushes, and ornamentals, cut back to hold its line through the season.</p>
+            </article>
+
+            <article class="tile tile--compact">
+                <div class="tile__icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z"/>
+                        <path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/>
+                    </svg>
+                </div>
+                <h3>Spring &amp; fall cleanup</h3>
+                <p>Leaf removal, bed clearing, and debris hauling at both ends of the season.</p>
+            </article>
+        </div>
+    </div>
+</section>
+
+<!-- ── Our work ────────────────────────────────────────────────────────── -->
+<section class="band band--deep" id="work">
+    <div class="shell">
+        <div class="section-head">
+            <p class="eyebrow">Our work</p>
+            <h2 class="t-section">Properties we keep.</h2>
+            <p class="lede">A few of the lawns we look after across Fairlawn, Copley, and Bath.</p>
+        </div>
+
+        <div class="gallery">
+            <div class="shot shot--wide">
+                <picture>
+                    <source type="image/webp"
+                            srcset="{{ url_for('static', filename='landingPage/Willow-560.webp') }} 560w,
+                                    {{ url_for('static', filename='landingPage/Willow-765.webp') }} 765w"
+                            sizes="(max-width: 520px) 100vw, (max-width: 960px) 100vw, 560px">
+                    <img src="{{ url_for('static', filename='landingPage/Willow.png') }}"
+                         alt="A dog resting on a cut lawn beside a patio and flowering planters"
+                         width="765" height="1020" loading="lazy">
+                </picture>
+            </div>
+
+            <div class="shot">
+                <picture>
+                    <source type="image/webp"
+                            srcset="{{ url_for('static', filename='landingPage/Creekstone1-400.webp') }} 400w,
+                                    {{ url_for('static', filename='landingPage/Creekstone1-800.webp') }} 800w"
+                            sizes="(max-width: 520px) 100vw, (max-width: 960px) 50vw, 280px">
+                    <img src="{{ url_for('static', filename='landingPage/Creekstone1.jpg') }}"
+                         alt="A freshly striped front lawn sweeping up to a brick and stone two-story home"
+                         width="800" height="600" loading="lazy">
+                </picture>
+            </div>
+
+            <div class="shot">
+                <picture>
+                    <source type="image/webp"
+                            srcset="{{ url_for('static', filename='landingPage/Dermot-400.webp') }} 400w,
+                                    {{ url_for('static', filename='landingPage/Dermot-800.webp') }} 800w"
+                            sizes="(max-width: 520px) 100vw, (max-width: 960px) 50vw, 280px">
+                    <img src="{{ url_for('static', filename='landingPage/Dermot.png') }}"
+                         alt="A shaded back lawn bordered by stone edging and mature trees"
+                         width="800" height="600" loading="lazy">
+                </picture>
+            </div>
+
+            <div class="shot">
+                <picture>
+                    <source type="image/webp"
+                            srcset="{{ url_for('static', filename='landingPage/461backyard-400.webp') }} 400w,
+                                    {{ url_for('static', filename='landingPage/461backyard-800.webp') }} 800w"
+                            sizes="(max-width: 520px) 100vw, (max-width: 960px) 50vw, 280px">
+                    <img src="{{ url_for('static', filename='landingPage/461backyard.png') }}"
+                         alt="A striped backyard lawn running up to a red garden shed"
+                         width="800" height="600" loading="lazy">
+                </picture>
+            </div>
+
+            <div class="shot">
+                <picture>
+                    <source type="image/webp"
+                            srcset="{{ url_for('static', filename='landingPage/Trevor-400.webp') }} 400w,
+                                    {{ url_for('static', filename='landingPage/Trevor-640.webp') }} 640w"
+                            sizes="(max-width: 520px) 100vw, (max-width: 960px) 50vw, 280px">
+                    <img src="{{ url_for('static', filename='landingPage/Trevor.png') }}"
+                         alt="A Clips crew member standing beside a split and stacked woodpile"
+                         width="640" height="853" loading="lazy">
+                </picture>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ── Reviews ─────────────────────────────────────────────────────────── -->
+<section class="band" id="reviews">
+    <div class="shell">
+        <div class="section-head">
+            <p class="eyebrow">Reviews</p>
+            <h2 class="t-section">What the neighbors say.</h2>
+            <p class="lede">Unedited reviews from homeowners on our route.</p>
+        </div>
+
+        <div class="reviews">
+            {% for review in reviews %}
+            <figure class="review{% if loop.first %} review--lead{% endif %}">
+                <p class="review__where">{{ review.location }}</p>
+                <blockquote class="review__text">{{ review.text }}</blockquote>
+                <figcaption class="review__who">{{ review.name }}</figcaption>
+            </figure>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+
+<!-- ── Quote ───────────────────────────────────────────────────────────── -->
+<section class="band" id="quote">
+    <div class="shell">
+        <div class="quote-panel">
+            <div>
+                <p class="eyebrow">Get on the route</p>
+                <h2 class="t-section">Tell us where the lawn is.</h2>
+                <p class="lede">Send us the address and we&rsquo;ll come look at the property and get you a price. No contract, no signup fee.</p>
+
+                <dl class="contact-list">
+                    <div>
+                        <dt>Phone</dt>
+                        <dd><a href="tel:+13306203465">(330) 620-3465</a></dd>
+                    </div>
+                    <div>
+                        <dt>Service area</dt>
+                        <dd>Fairlawn, Copley, Bath &amp; surrounding areas</dd>
+                    </div>
+                    <div>
+                        <dt>Already a customer?</dt>
+                        <dd><a href="{{ url_for('portal.portal_login') }}">View invoices and pay online &rarr;</a></dd>
+                    </div>
+                </dl>
+            </div>
+
+            <form class="quote-form" method="POST" action="{{ url_for('landing.request_quote') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="form_ts" value="{{ quote_token }}">
+
+                <div class="field field--trap" aria-hidden="true">
+                    <label for="website">Website</label>
+                    <input type="text" id="website" name="website" tabindex="-1" autocomplete="off">
+                </div>
+
+                <div class="field">
+                    <label for="q-name">Your name</label>
+                    <input type="text" id="q-name" name="name" required autocomplete="name"
+                           maxlength="{{ field_limits['name'] }}">
+                </div>
+
+                <div class="field">
+                    <label for="q-street">Street address</label>
+                    <input type="text" id="q-street" name="street" required
+                           autocomplete="address-line1" placeholder="123 Maple St"
+                           maxlength="{{ field_limits['street'] }}">
+                </div>
+
+                <div class="field--trio">
+                    <div class="field">
+                        <label for="q-city">City</label>
+                        <input type="text" id="q-city" name="city" required
+                               autocomplete="address-level2" placeholder="Fairlawn"
+                               maxlength="{{ field_limits['city'] }}">
+                    </div>
+                    <div class="field">
+                        <label for="q-state">State</label>
+                        <input type="text" id="q-state" name="state" required
+                               autocomplete="address-level1" placeholder="OH" maxlength="2">
+                    </div>
+                    <div class="field">
+                        <label for="q-zip">ZIP</label>
+                        <input type="text" id="q-zip" name="zip" required
+                               autocomplete="postal-code" placeholder="44333" maxlength="10"
+                               inputmode="numeric">
+                    </div>
+                </div>
+
+                <div class="field--pair">
+                    <div class="field">
+                        <label for="q-phone">Phone</label>
+                        <input type="tel" id="q-phone" name="phone" autocomplete="tel"
+                               maxlength="{{ field_limits['phone'] }}">
+                    </div>
+                    <div class="field">
+                        <label for="q-email">Email</label>
+                        <input type="email" id="q-email" name="email" autocomplete="email"
+                               maxlength="{{ field_limits['email'] }}">
+                    </div>
+                </div>
+
+                <div class="field">
+                    <label for="q-service">What do you need?</label>
+                    <select id="q-service" name="service">
+                        {% for option in services %}
+                        <option value="{{ option }}">{{ option }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="field">
+                    <label for="q-notes">Anything we should know? <span class="form-note">(optional)</span></label>
+                    <textarea id="q-notes" name="notes" rows="3"
+                              maxlength="{{ field_limits['notes'] }}"></textarea>
+                </div>
+
+                <button type="submit" class="btn btn--accent">Send request</button>
+                <p class="form-note">Include a phone number or email so we can reach you.</p>
+            </form>
+        </div>
+    </div>
+</section>
+
+</main>
+
+<!-- ── Footer ──────────────────────────────────────────────────────────── -->
+<footer class="footer">
+    <div class="shell">
+        <div class="footer__grid">
+            <div class="footer__brand">
+                <img src="{{ url_for('static', filename='logo.png') }}" alt="" width="66" height="44">
+                <p>Locally owned lawn care and landscaping in the greater Akron area.</p>
+            </div>
+
+            <div>
+                <h2>Services</h2>
+                <ul>
+                    <li><a href="#services">Weekly mowing</a></li>
+                    <li><a href="#services">Mulching</a></li>
+                    <li><a href="#services">Hedge trimming</a></li>
+                    <li><a href="#services">Spring &amp; fall cleanup</a></li>
+                </ul>
+            </div>
+
+            <div>
+                <h2>Contact</h2>
+                <ul>
+                    <li><a href="tel:+13306203465">(330) 620-3465</a></li>
+                    <li><a href="#quote">Request a quote</a></li>
+                    <li>Fairlawn, Copley &amp; Bath</li>
+                </ul>
+            </div>
+
+            <div>
+                <h2>Sign in</h2>
+                <ul>
+                    <li><a href="{{ url_for('portal.portal_login') }}">Customer portal</a></li>
+                    <li><a href="{{ url_for('staff.staff_login') }}">Employee portal</a></li>
+                    <li><a href="{{ url_for('core.dashboard') }}">Admin</a></li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="footer__base">
+            <p>&copy; {{ current_year }} Clips by Rorabaugh, LLC. All rights reserved.</p>
+            <p>Serving the greater Akron area.</p>
+        </div>
+    </div>
+</footer>
+
+<script>
+(function () {
+    // Nav gains a solid backdrop once the page scrolls past the hero's top edge.
+    var nav = document.getElementById('nav');
+    var onScroll = function () {
+        nav.classList.toggle('is-stuck', window.scrollY > 24);
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
+
+    // Mobile menu.
+    var toggle = document.getElementById('navToggle');
+    var links = document.getElementById('navLinks');
+    toggle.addEventListener('click', function () {
+        var open = links.classList.toggle('is-open');
+        toggle.setAttribute('aria-expanded', String(open));
+        toggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    });
+
+    // Close the menu after tapping a link, otherwise it covers the target.
+    links.addEventListener('click', function (e) {
+        if (e.target.closest('a') && links.classList.contains('is-open')) {
+            links.classList.remove('is-open');
+            toggle.setAttribute('aria-expanded', 'false');
+            toggle.setAttribute('aria-label', 'Open menu');
+        }
+    });
+
+    // Flash messages are transient confirmations, not page furniture.
+    var flashes = document.querySelector('.flash-stack');
+    if (flashes) {
+        setTimeout(function () {
+            flashes.style.transition = 'opacity 400ms ease';
+            flashes.style.opacity = '0';
+            setTimeout(function () { flashes.remove(); }, 400);
+        }, 6000);
+    }
+})();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,180 @@
+{% extends "base.html" %}
+{% block title %}Services - Clips Admin{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <h1><i class="bi bi-clipboard-check"></i> Services</h1>
+    <div class="d-flex gap-2">
+        <button type="button" id="select-toggle" class="btn btn-outline-secondary"
+                onclick="toggleSelectMode()">
+            <i class="bi bi-check-square"></i> Select
+        </button>
+        <a href="{{ url_for('services_bp.service_quick_add') }}" class="btn btn-green">
+            <i class="bi bi-plus-circle"></i> Add Service
+        </a>
+    </div>
+</div>
+
+<!-- Filters -->
+<div class="card shadow-sm mb-3">
+    <div class="card-body py-2">
+        <form method="GET" class="row g-2 align-items-end">
+            <div class="col-md-3">
+                <input type="text" class="form-control" name="search"
+                       placeholder="Search by client name" value="{{ search }}">
+            </div>
+            <div class="col-md-2">
+                <select class="form-select" name="type">
+                    <option value="all" {% if service_type == 'all' %}selected{% endif %}>All Types</option>
+                    {% for val, label in service_types %}
+                    <option value="{{ val }}" {% if service_type == val %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <input type="date" class="form-control" name="date_from"
+                       value="{{ date_from }}" placeholder="From">
+            </div>
+            <div class="col-md-2">
+                <input type="date" class="form-control" name="date_to"
+                       value="{{ date_to }}" placeholder="To">
+            </div>
+            <div class="col-md-3 d-flex gap-2">
+                <button type="submit" class="btn btn-green">
+                    <i class="bi bi-search"></i> Filter
+                </button>
+                <a href="{{ url_for('services_bp.services') }}" class="btn btn-outline-secondary">Clear</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Bulk delete action bar -->
+<div id="bulk-action-bar" class="d-none mb-2">
+    <form method="POST" action="{{ url_for('services_bp.service_bulk_delete') }}"
+          id="bulk-delete-form"
+          onsubmit="return confirmBulkDelete()">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div id="bulk-checkbox-container"></div>
+        <button type="submit" class="btn btn-danger btn-sm">
+            <i class="bi bi-trash"></i> Delete Selected (<span id="selected-count">0</span>)
+        </button>
+    </form>
+</div>
+
+<!-- Services table -->
+<div class="card shadow-sm">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th class="select-col d-none" style="width:36px">
+                            <input type="checkbox" id="select-all" onclick="toggleAll(this)">
+                        </th>
+                        <th>Date</th>
+                        <th>Client</th>
+                        <th>Service</th>
+                        <th class="d-none d-md-table-cell">Description</th>
+                        <th class="text-end">Amount</th>
+                        <th class="action-col"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for s in services %}
+                    <tr>
+                        <td class="select-col d-none">
+                            <input type="checkbox" name="service_ids" value="{{ s.id }}"
+                                   class="row-checkbox" onchange="updateCount()">
+                        </td>
+                        <td>{{ s.service_date.strftime('%m/%d/%Y') }}</td>
+                        <td>
+                            <a href="{{ url_for('clients.client_detail', client_id=s.client_id) }}">
+                                {{ s.client.full_name }}
+                            </a>
+                        </td>
+                        <td>{{ s.service_type_display }}</td>
+                        <td class="d-none d-md-table-cell text-muted">{{ s.description }}</td>
+                        <td class="text-end fw-bold">{{ s.amount|currency }}</td>
+                        <td class="text-end action-col">
+                            <a href="{{ url_for('services_bp.service_edit', service_id=s.id) }}" class="btn btn-sm btn-outline-secondary" aria-label="Edit service">
+                                <i class="bi bi-pencil"></i>
+                            </a>
+                            <form method="POST" action="{{ url_for('services_bp.service_delete', service_id=s.id) }}"
+                                  class="d-inline"
+                                  onsubmit="return confirm('Are you sure you want to delete this service? This cannot be undone.')">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-sm btn-outline-danger" aria-label="Delete service">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="7">
+                            <div class="empty-state">
+                                <i class="bi bi-clipboard-check"></i>
+                                <h5>No services found</h5>
+                                <p>Try adjusting your filter criteria or add a new service.</p>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <div class="card-footer d-flex justify-content-between">
+        <span class="text-muted small">{{ services|length }} service(s)</span>
+        <span class="fw-bold">Total: {{ total|currency }}</span>
+    </div>
+</div>
+
+<script>
+function toggleSelectMode() {
+    const active = document.body.classList.toggle('select-mode');
+    document.querySelectorAll('.select-col').forEach(el => el.classList.toggle('d-none', !active));
+    document.querySelectorAll('.action-col').forEach(el => el.classList.toggle('d-none', active));
+    document.getElementById('bulk-action-bar').classList.toggle('d-none', !active);
+    const btn = document.getElementById('select-toggle');
+    btn.innerHTML = active
+        ? '<i class="bi bi-x-lg"></i> Cancel'
+        : '<i class="bi bi-check-square"></i> Select';
+    if (!active) {
+        document.querySelectorAll('.row-checkbox').forEach(cb => cb.checked = false);
+        document.getElementById('select-all').checked = false;
+        updateCount();
+    }
+}
+
+function toggleAll(master) {
+    document.querySelectorAll('.row-checkbox').forEach(cb => cb.checked = master.checked);
+    updateCount();
+}
+
+function updateCount() {
+    const n = document.querySelectorAll('.row-checkbox:checked').length;
+    document.getElementById('selected-count').textContent = n;
+}
+
+function confirmBulkDelete() {
+    const checkboxes = document.querySelectorAll('.row-checkbox:checked');
+    const n = checkboxes.length;
+    if (n === 0) { alert('No services selected.'); return false; }
+    if (!confirm(`Delete ${n} service(s)? This cannot be undone.`)) return false;
+
+    // Move checked values into the form before submit
+    const container = document.getElementById('bulk-checkbox-container');
+    container.innerHTML = '';
+    checkboxes.forEach(cb => {
+        const hidden = document.createElement('input');
+        hidden.type = 'hidden';
+        hidden.name = 'service_ids';
+        hidden.value = cb.value;
+        container.appendChild(hidden);
+    });
+    return true;
+}
+</script>
+{% endblock %}

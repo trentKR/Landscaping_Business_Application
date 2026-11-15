@@ -1,0 +1,197 @@
+{% extends "base.html" %}
+{% block title %}Dashboard - Clips Admin{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <h1><i class="bi bi-speedometer2"></i> Dashboard</h1>
+    <span class="text-muted" style="font-size: 0.875rem;">{{ today.strftime('%A, %B %d, %Y') }}</span>
+</div>
+
+<!-- Stat cards -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-lg-3">
+        <div class="card stat-card stat-card-green">
+            <div class="card-body">
+                <div class="stat-label">This Week</div>
+                <div class="stat-value">{{ weekly_revenue|currency }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="card stat-card stat-card-teal">
+            <div class="card-body">
+                <div class="stat-label">This Month</div>
+                <div class="stat-value">{{ monthly_revenue|currency }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="card stat-card {% if monthly_profit > 0 %}stat-card-green{% elif monthly_profit < 0 %}stat-card-red{% else %}stat-card-neutral{% endif %}">
+            <div class="card-body">
+                <div class="stat-label">Net Profit</div>
+                <div class="stat-value {% if monthly_profit > 0 %}profit-positive{% elif monthly_profit < 0 %}profit-negative{% endif %}">
+                    {{ monthly_profit|currency }}
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="card stat-card stat-card-amber">
+            <div class="card-body">
+                <div class="stat-label">Services This Week</div>
+                <div class="stat-value">{{ services_this_week }}</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick actions + clients + AR + costs -->
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="card h-100">
+            <div class="card-header">Quick Actions</div>
+            <div class="card-body d-grid gap-2">
+                <a href="{{ url_for('services_bp.service_quick_add') }}" class="btn btn-green">Add Service</a>
+                <a href="{{ url_for('expenses.expense_quick_add') }}" class="btn btn-outline-secondary">Add Expense</a>
+                <a href="{{ url_for('invoices.invoice_create') }}" class="btn btn-outline-secondary">Create Invoice</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card h-100">
+            <div class="card-header">Clients</div>
+            <div class="card-body">
+                <div class="d-flex justify-content-between mb-2">
+                    <span class="text-muted">Active Clients</span>
+                    <strong>{{ total_clients }}</strong>
+                </div>
+                <div class="d-flex justify-content-between mb-2">
+                    <span class="text-muted">Weekly Mowing</span>
+                    <strong>{{ weekly_clients }}</strong>
+                </div>
+                <div class="d-flex justify-content-between mb-3">
+                    <span class="text-muted">Seasonal Only</span>
+                    <strong>{{ total_clients - weekly_clients }}</strong>
+                </div>
+                <a href="{{ url_for('clients.clients') }}" class="card-view-link">View All Clients</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card h-100">
+            <div class="card-header">Accounts Receivable</div>
+            <div class="card-body">
+                <div class="d-flex justify-content-between mb-2">
+                    <span class="text-muted">Outstanding</span>
+                    <strong>{{ total_ar|currency }}</strong>
+                </div>
+                <div class="d-flex justify-content-between mb-3">
+                    <span class="text-muted">Unpaid Invoices</span>
+                    <strong>{{ unpaid_invoice_count }}</strong>
+                </div>
+                <a href="{{ url_for('invoices.invoice_list') }}" class="card-view-link">View Invoices</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card h-100">
+            <div class="card-header">Monthly Costs</div>
+            <div class="card-body">
+                <div class="d-flex justify-content-between mb-2">
+                    <span class="text-muted">Payroll</span>
+                    <strong>{{ monthly_payroll|currency }}</strong>
+                </div>
+                <div class="d-flex justify-content-between mb-2">
+                    <span class="text-muted">Expenses</span>
+                    <strong>{{ monthly_expenses|currency }}</strong>
+                </div>
+                <div class="d-flex justify-content-between mb-3">
+                    <span class="text-muted">Total Costs</span>
+                    <strong {% if (monthly_payroll + monthly_expenses) > 0 %}class="text-danger"{% endif %}>{{ (monthly_payroll + monthly_expenses)|currency }}</strong>
+                </div>
+                <a href="{{ url_for('expenses.expense_list') }}" class="card-view-link">View Expenses</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Top expense categories + recent services -->
+<div class="row g-3">
+    {% if top_categories %}
+    <div class="col-md-4">
+        <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>Top Expenses This Month</span>
+            </div>
+            <div class="card-body">
+                {% for cat_name, cat_total in top_categories %}
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="badge badge-category">{{ cat_name }}</span>
+                    <strong>{{ cat_total|currency }}</strong>
+                </div>
+                {% endfor %}
+                <hr>
+                <div class="d-flex justify-content-between align-items-center">
+                    <strong>Total Expenses</strong>
+                    <strong>{{ monthly_expenses|currency }}</strong>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-8">
+    {% else %}
+    <div class="col-12">
+    {% endif %}
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>Recent Services</span>
+                <a href="{{ url_for('services_bp.services') }}" class="btn btn-sm btn-outline-secondary">View All</a>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Client</th>
+                                <th>Service</th>
+                                <th class="text-end">Amount</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for s in recent_services %}
+                            <tr>
+                                <td>{{ s.service_date.strftime('%m/%d/%Y') }}</td>
+                                <td>
+                                    <a href="{{ url_for('clients.client_detail', client_id=s.client_id) }}">
+                                        {{ s.client.full_name }}
+                                    </a>
+                                </td>
+                                <td>{{ s.service_type_display }}</td>
+                                <td class="text-end fw-bold">{{ s.amount|currency }}</td>
+                                <td class="text-end">
+                                    <a href="{{ url_for('services_bp.service_edit', service_id=s.id) }}"
+                                       class="btn btn-sm btn-outline-secondary" aria-label="Edit service">
+                                        <i class="bi bi-pencil"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="5">
+                                    <div class="empty-state">
+                                        <i class="bi bi-calendar2-week"></i>
+                                        <h5>No services yet</h5>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

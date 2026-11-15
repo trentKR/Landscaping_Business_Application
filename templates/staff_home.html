@@ -1,0 +1,83 @@
+{% extends "staff_base.html" %}
+{% block title %}Dashboard - Employee Portal - Clips{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <h4 class="mb-3">
+        <i class="bi bi-speedometer2"></i> Dashboard
+    </h4>
+
+    <!-- Stat cards -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-4">
+            <div class="card stat-card stat-card-green">
+                <div class="card-body">
+                    <div class="stat-label">This Week</div>
+                    <div class="stat-value">${{ '%.2f' % week_pay }}</div>
+                    <div class="text-muted" style="font-size:0.8rem">{{ '%.1f' % week_hours }}h worked</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card stat-card stat-card-teal">
+                <div class="card-body">
+                    <div class="stat-label">This Month</div>
+                    <div class="stat-value">${{ '%.2f' % month_pay }}</div>
+                    <div class="text-muted" style="font-size:0.8rem">{{ '%.1f' % month_hours }}h worked</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card stat-card stat-card-blue">
+                <div class="card-body">
+                    <div class="stat-label">Year-to-Date</div>
+                    <div class="stat-value">${{ '%.2f' % ytd_pay }}</div>
+                    <div class="text-muted" style="font-size:0.8rem">{{ '%.1f' % ytd_hours }}h worked</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent weeks -->
+    <h5 class="mb-3"><i class="bi bi-clock-history"></i> Recent Weeks</h5>
+    {% if recent_weeks %}
+    <div class="card shadow-sm">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0 align-middle">
+                <thead>
+                    <tr>
+                        <th>Week</th>
+                        <th class="text-center d-none d-md-table-cell">Days Worked</th>
+                        <th class="text-end">Hours</th>
+                        <th class="text-end">Earnings</th>
+                        <th class="text-center">Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for week in recent_weeks %}
+                    <tr style="cursor:pointer" onclick="window.location='{{ url_for('staff.staff_timesheet', week=week.week_start.isoformat()) }}'">
+                        <td class="fw-medium">
+                            {{ week.week_start.strftime('%b %d').replace(' 0', ' ') }} &ndash; {{ week.week_end.strftime('%b %d').replace(' 0', ' ') }}
+                        </td>
+                        <td class="text-center d-none d-md-table-cell">{{ week.days_worked }}</td>
+                        <td class="text-end">{{ '%.1f' % week.hours }}h</td>
+                        <td class="text-end">${{ '%.2f' % week.pay }}</td>
+                        <td class="text-center">
+                            <span class="badge badge-{{ week.status }}">{{ week.status }}</span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% else %}
+    <div class="card shadow-sm">
+        <div class="card-body text-center text-muted py-5">
+            <i class="bi bi-calendar-x" style="font-size:2rem"></i>
+            <p class="mt-2 mb-0">No time entries yet. Head to your <a href="{{ url_for('staff.staff_timesheet') }}">Timesheet</a> to log hours.</p>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

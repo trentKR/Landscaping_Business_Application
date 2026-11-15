@@ -1,0 +1,454 @@
+{% extends "base.html" %}
+{% block title %}Add Services - Clips Admin{% endblock %}
+
+{#- Grid row macro, rendered for initial blanks and into <template>. -#}
+{% macro service_row(idx) %}
+<tr class="service-row">
+    <td data-label="Date">
+        <input type="hidden" name="row_index" value="{{ idx }}">
+        <input type="date" class="form-control form-control-sm"
+               name="service_date_{{ idx }}" data-field="service_date"
+               value="{{ today.isoformat() }}">
+        <div class="invalid-feedback"></div>
+    </td>
+    <td data-label="Client">
+        <select class="form-select form-select-sm" name="client_id_{{ idx }}" data-field="client_id">
+            <option value="">Client...</option>
+            {% for c in clients %}
+            <option value="{{ c.id }}" data-rate="{{ client_rates.get(c.id, 0) }}">{{ c.last_name }}, {{ c.first_name }}</option>
+            {% endfor %}
+        </select>
+        <div class="invalid-feedback"></div>
+    </td>
+    <td data-label="Type">
+        <select class="form-select form-select-sm" name="service_type_{{ idx }}" data-field="service_type">
+            {% for val, label in service_types %}
+            <option value="{{ val }}">{{ label }}</option>
+            {% endfor %}
+        </select>
+    </td>
+    <td data-label="Description">
+        <input type="text" class="form-control form-control-sm" name="description_{{ idx }}"
+               data-field="description" maxlength="250" placeholder="Optional">
+    </td>
+    <td data-label="Amount">
+        <div class="input-group input-group-sm">
+            <span class="input-group-text">$</span>
+            <input type="number" class="form-control text-end" name="amount_{{ idx }}"
+                   data-field="amount" step="0.01" min="0" placeholder="0.00" inputmode="decimal">
+            <div class="invalid-feedback"></div>
+        </div>
+    </td>
+    <td class="td-remove" data-label="">
+        <button type="button" class="btn btn-sm btn-outline-danger remove-row" aria-label="Remove row">&times;</button>
+    </td>
+</tr>
+{% endmacro %}
+
+{% block content %}
+<div class="page-header">
+    <h1><i class="bi bi-plus-circle-fill"></i> Add Services</h1>
+</div>
+
+<!-- Two tabs: Grid + Mowing Checklist -->
+<ul class="nav nav-tabs mb-3" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="checklist-tab" data-bs-toggle="tab"
+                data-bs-target="#checklistPane" type="button" role="tab">
+            <i class="bi bi-check2-square"></i> Mowing Checklist
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="grid-tab" data-bs-toggle="tab"
+                data-bs-target="#gridPane" type="button" role="tab">
+            <i class="bi bi-grid-3x3"></i> Other Services
+        </button>
+    </li>
+</ul>
+
+<div class="tab-content">
+    <!-- Tab 2: Other Services Grid -->
+    <div class="tab-pane fade" id="gridPane" role="tabpanel">
+        <form method="POST" id="gridForm" novalidate>
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="mode" value="grid">
+
+            <div class="alert alert-danger d-none" id="gridError" role="alert">
+                <i class="bi bi-exclamation-triangle-fill"></i> <span id="gridErrorText"></span>
+            </div>
+
+            <div class="card shadow-sm">
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0 quick-grid" style="min-width:960px">
+                            <thead>
+                                <tr>
+                                    <th style="width:140px">Date</th>
+                                    <th style="width:210px">Client</th>
+                                    <th style="width:140px">Type</th>
+                                    <th>Description</th>
+                                    <th style="width:120px">Amount</th>
+                                    <th style="width:40px"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="serviceRows">
+                                {% for i in range(blank_rows) %}{{ service_row(i) }}{% endfor %}
+                            </tbody>
+                            <tfoot>
+                                <tr>
+                                    <td colspan="4" class="text-end">Total</td>
+                                    <td class="text-end" id="gridTotal">$0.00</td>
+                                    <td></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+                <div class="card-footer d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="addRowBtn">
+                        <i class="bi bi-plus"></i> Add Row
+                    </button>
+                    <span class="text-muted small"><span id="filledCount">0</span> service(s) ready to save</span>
+                </div>
+            </div>
+
+            <div class="d-flex gap-2 mt-3">
+                <button type="submit" class="btn btn-green" id="saveBtn">
+                    <i class="bi bi-check-lg"></i> Save All Services
+                </button>
+                <a href="{{ url_for('services_bp.services') }}" class="btn btn-outline-secondary">Cancel</a>
+            </div>
+        </form>
+
+        <template id="rowTemplate">{{ service_row('__INDEX__') }}</template>
+    </div>
+
+    <!-- Tab 1: Mowing Checklist -->
+    <div class="tab-pane fade show active" id="checklistPane" role="tabpanel">
+        <form method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="mode" value="checklist">
+
+            <div class="row g-3 mb-3">
+                <div class="col-md-3">
+                    <label for="service_date" class="form-label">Service Date</label>
+                    <input type="date" class="form-control" id="service_date"
+                           name="service_date" value="{{ today.isoformat() }}" required>
+                </div>
+                <div class="col-md-9 d-flex align-items-end gap-2">
+                    <button type="button" class="btn btn-outline-secondary btn-select-all" onclick="toggleAll(true)">
+                        <i class="bi bi-check-all"></i> Select All
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary btn-select-all" onclick="toggleAll(false)">
+                        <i class="bi bi-x-lg"></i> Deselect All
+                    </button>
+                </div>
+            </div>
+
+            {% if route_groups or unassigned %}
+            <div class="accordion route-accordion mb-3" id="quickAddAccordion">
+                {% for route, route_clients in route_groups %}
+                <div class="accordion-item">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button" type="button"
+                                data-bs-toggle="collapse" data-bs-target="#route_{{ route.id }}">
+                            {{ route.name }}
+                            <span class="badge badge-category ms-2">{{ route_clients|length }} client{{ 's' if route_clients|length != 1 else '' }}</span>
+                        </button>
+                    </h2>
+                    <div id="route_{{ route.id }}" class="accordion-collapse collapse show">
+                        <div class="accordion-body p-0">
+                            {% for c in route_clients %}
+                            <div class="quick-add-row d-flex align-items-center px-3" id="row_{{ c.id }}">
+                                <div class="form-check flex-grow-1">
+                                    <input class="form-check-input client-check" type="checkbox"
+                                           id="check_{{ c.id }}" name="client_{{ c.id }}" value="1"
+                                           onchange="toggleRow({{ c.id }})">
+                                    <label class="form-check-label w-100" for="check_{{ c.id }}">
+                                        <strong>{{ c.full_name }}</strong>
+                                        <span class="text-muted ms-2 d-none d-md-inline">{{ c.full_address }}</span>
+                                    </label>
+                                </div>
+                                <div style="width: 120px">
+                                    <input type="number" step="0.01" min="0" class="form-control form-control-sm text-end"
+                                           name="rate_{{ c.id }}" value="{{ c.default_mowing_rate }}"
+                                           placeholder="Rate">
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+
+                {% if unassigned %}
+                <div class="accordion-item route-unassigned">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button" type="button"
+                                data-bs-toggle="collapse" data-bs-target="#unassigned">
+                            Unassigned
+                            <span class="badge badge-category ms-2">{{ unassigned|length }} client{{ 's' if unassigned|length != 1 else '' }}</span>
+                        </button>
+                    </h2>
+                    <div id="unassigned" class="accordion-collapse collapse show">
+                        <div class="accordion-body p-0">
+                            {% for c in unassigned %}
+                            <div class="quick-add-row d-flex align-items-center px-3" id="row_{{ c.id }}">
+                                <div class="form-check flex-grow-1">
+                                    <input class="form-check-input client-check" type="checkbox"
+                                           id="check_{{ c.id }}" name="client_{{ c.id }}" value="1"
+                                           onchange="toggleRow({{ c.id }})">
+                                    <label class="form-check-label w-100" for="check_{{ c.id }}">
+                                        <strong>{{ c.full_name }}</strong>
+                                        <span class="text-muted ms-2 d-none d-md-inline">{{ c.full_address }}</span>
+                                    </label>
+                                </div>
+                                <div style="width: 120px">
+                                    <input type="number" step="0.01" min="0" class="form-control form-control-sm text-end"
+                                           name="rate_{{ c.id }}" value="{{ c.default_mowing_rate }}"
+                                           placeholder="Rate">
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+            {% else %}
+            <div class="card shadow-sm mb-3">
+                <div class="p-4 text-center text-muted">
+                    No weekly clients found. <a href="{{ url_for('clients.client_new') }}">Add a client</a> and mark them as weekly.
+                </div>
+            </div>
+            {% endif %}
+
+            {% if weekly_clients %}
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-green">
+                    <i class="bi bi-check-lg"></i> Record Mowing Services
+                </button>
+                <a href="{{ url_for('services_bp.services') }}" class="btn btn-outline-secondary">Cancel</a>
+            </div>
+            {% endif %}
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// --- Checklist tab ---
+function toggleRow(clientId) {
+    const cb = document.getElementById('check_' + clientId);
+    const row = document.getElementById('row_' + clientId);
+    if (cb.checked) {
+        row.classList.add('checked');
+    } else {
+        row.classList.remove('checked');
+    }
+}
+
+function toggleAll(state) {
+    document.querySelectorAll('.accordion-collapse').forEach(function(section) {
+        if (!section.classList.contains('show')) return;
+        section.querySelectorAll('.quick-add-row').forEach(function(row) {
+            const cb = row.querySelector('.client-check');
+            if (!cb) return;
+            cb.checked = state;
+            if (state) {
+                row.classList.add('checked');
+            } else {
+                row.classList.remove('checked');
+            }
+        });
+    });
+}
+
+// --- Grid tab ---
+(function () {
+    const form      = document.getElementById('gridForm');
+    const tbody     = document.getElementById('serviceRows');
+    const tpl       = document.getElementById('rowTemplate');
+    const saveBtn   = document.getElementById('saveBtn');
+    const errBox    = document.getElementById('gridError');
+    const errText   = document.getElementById('gridErrorText');
+    const totalCell = document.getElementById('gridTotal');
+    const countCell = document.getElementById('filledCount');
+    const MAX_ROWS  = {{ max_rows }};
+    let nextIndex   = {{ blank_rows }};
+    let submitting  = false;
+
+    // Client rates for autofill
+    const CLIENT_RATES = {{ client_rates|tojson }};
+    const MOWING_DESCRIPTION = 'Weekly mowing';
+
+    const field = (tr, name) => tr.querySelector('[data-field="' + name + '"]');
+
+    const MEANINGFUL = ['client_id', 'amount', 'description'];
+    function rowIsBlank(tr) {
+        return MEANINGFUL.every(function (f) {
+            const el = field(tr, f);
+            return !el || !el.value.trim();
+        });
+    }
+
+    function addRow(inheritFrom) {
+        if (tbody.children.length >= MAX_ROWS) return null;
+        tbody.insertAdjacentHTML('beforeend',
+            tpl.innerHTML.replace(/__INDEX__/g, nextIndex++));
+        const tr = tbody.lastElementChild;
+        if (inheritFrom) {
+            field(tr, 'service_date').value  = field(inheritFrom, 'service_date').value;
+            field(tr, 'service_type').value  = field(inheritFrom, 'service_type').value;
+        }
+        return tr;
+    }
+
+    function clearRow(tr) {
+        field(tr, 'client_id').value = '';
+        field(tr, 'service_type').value = 'mowing';
+        field(tr, 'description').value = '';
+        field(tr, 'amount').value = '';
+        tr.querySelectorAll('.is-invalid').forEach(el => el.classList.remove('is-invalid'));
+    }
+
+    function ensureTrailingBlank() {
+        const last = tbody.lastElementChild;
+        if (!last || !rowIsBlank(last)) addRow(last);
+    }
+
+    // Client and type drive the amount and description; both are defaults, so
+    // changing either rewrites them rather than stranding the last client's rate.
+    function applyClientContext(tr) {
+        const sel  = field(tr, 'client_id');
+        const type = field(tr, 'service_type');
+        const amt  = field(tr, 'amount');
+        const desc = field(tr, 'description');
+
+        if (sel.value && type.value === 'mowing') {
+            const rate = parseFloat(CLIENT_RATES[sel.value]);
+            amt.value  = rate > 0 ? rate.toFixed(2) : '';
+            desc.value = MOWING_DESCRIPTION;
+        } else {
+            amt.value  = '';
+            desc.value = '';
+        }
+    }
+
+    function money(n) {
+        return (n < 0 ? '-$' : '$') + Math.abs(n)
+            .toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    }
+
+    function updateTotals() {
+        let total = 0, count = 0;
+        tbody.querySelectorAll('tr').forEach(function (tr) {
+            if (rowIsBlank(tr)) return;
+            count++;
+            total += parseFloat(field(tr, 'amount').value) || 0;
+        });
+        totalCell.textContent = money(total);
+        countCell.textContent = count;
+    }
+
+    function onEdit(e) {
+        const tr = e.target.closest('tr');
+        if (!tr) return;
+        e.target.classList.remove('is-invalid');
+        if (e.target.matches('[data-field="client_id"]') || e.target.matches('[data-field="service_type"]')) {
+            applyClientContext(tr);
+        }
+        if (tr === tbody.lastElementChild && !rowIsBlank(tr)) addRow(tr);
+        updateTotals();
+    }
+    tbody.addEventListener('input', onEdit);
+    tbody.addEventListener('change', onEdit);
+
+    tbody.addEventListener('click', function (e) {
+        const btn = e.target.closest('.remove-row');
+        if (!btn) return;
+        const tr = btn.closest('tr');
+        if (tbody.children.length === 1) {
+            clearRow(tr);
+        } else {
+            tr.remove();
+        }
+        ensureTrailingBlank();
+        updateTotals();
+    });
+
+    tbody.addEventListener('wheel', function (e) {
+        if (e.target.matches('input[type="number"]:focus')) e.target.blur();
+    }, {passive: true});
+
+    document.getElementById('addRowBtn').addEventListener('click', function () {
+        const tr = addRow(tbody.lastElementChild);
+        if (tr) field(tr, 'client_id').focus();
+    });
+
+    function markInvalid(el, msg) {
+        el.classList.add('is-invalid');
+        const fb = el.parentElement.querySelector('.invalid-feedback');
+        if (fb) fb.textContent = msg;
+    }
+
+    function validateRow(tr) {
+        const bad = [];
+        const d = field(tr, 'service_date');
+        if (!d.value) { markInvalid(d, 'Required.'); bad.push(d); }
+
+        const c = field(tr, 'client_id');
+        if (!c.value) { markInvalid(c, 'Required.'); bad.push(c); }
+
+        const a = field(tr, 'amount');
+        const n = parseFloat(a.value);
+        if (!a.value.trim())   { markInvalid(a, 'Required.');        bad.push(a); }
+        else if (!isFinite(n)) { markInvalid(a, 'Not a number.');    bad.push(a); }
+        else if (n <= 0)       { markInvalid(a, 'Must be over $0.'); bad.push(a); }
+
+        return bad;
+    }
+
+    form.addEventListener('submit', function (e) {
+        if (submitting) { e.preventDefault(); return; }
+
+        errBox.classList.add('d-none');
+        tbody.querySelectorAll('.is-invalid').forEach(el => el.classList.remove('is-invalid'));
+
+        let firstBad = null, badRows = 0, realRows = 0;
+        tbody.querySelectorAll('tr').forEach(function (tr) {
+            if (rowIsBlank(tr)) return;
+            realRows++;
+            const bad = validateRow(tr);
+            if (bad.length) {
+                badRows++;
+                if (!firstBad) firstBad = bad[0];
+            }
+        });
+
+        if (realRows === 0) {
+            e.preventDefault();
+            errText.textContent = 'Enter at least one service before saving.';
+            errBox.classList.remove('d-none');
+            errBox.scrollIntoView({block: 'center', behavior: 'smooth'});
+            return;
+        }
+        if (firstBad) {
+            e.preventDefault();
+            errText.textContent = badRows + ' row(s) need attention — fix the highlighted fields and try again.';
+            errBox.classList.remove('d-none');
+            firstBad.scrollIntoView({block: 'center', behavior: 'smooth'});
+            firstBad.focus({preventScroll: true});
+            return;
+        }
+
+        submitting = true;
+        saveBtn.disabled = true;
+        saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Saving...';
+    });
+
+    updateTotals();
+})();
+</script>
+{% endblock %}

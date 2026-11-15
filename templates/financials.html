@@ -1,0 +1,296 @@
+{% extends "base.html" %}
+{% block title %}Financials - Clips Admin{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <h1><i class="bi bi-graph-up"></i> Financial Overview</h1>
+    <form method="GET" class="d-flex gap-2 align-items-center">
+        <label class="form-label mb-0 fw-bold">Year:</label>
+        <select class="form-select form-select-sm" name="year" onchange="this.form.submit()" style="width:auto">
+            {% for y in years %}
+            <option value="{{ y }}" {% if y == year %}selected{% endif %}>{{ y }}</option>
+            {% endfor %}
+        </select>
+    </form>
+</div>
+
+<!-- Annual summary cards -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-lg-3">
+        <div class="card stat-card stat-card-green">
+            <div class="card-body">
+                <div class="stat-label">Total Revenue</div>
+                <div class="stat-value">{{ total_income|currency }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="card stat-card {% if total_payroll > 0 %}stat-card-red{% else %}stat-card-neutral{% endif %}">
+            <div class="card-body">
+                <div class="stat-label">Total Payroll</div>
+                <div class="stat-value {% if total_payroll > 0 %}profit-negative{% endif %}">{{ total_payroll|currency }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="card stat-card {% if total_expenses > 0 %}stat-card-amber{% else %}stat-card-neutral{% endif %}">
+            <div class="card-body">
+                <div class="stat-label">Total Expenses</div>
+                <div class="stat-value">{{ total_expenses|currency }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="card stat-card {% if total_profit > 0 %}stat-card-green{% elif total_profit < 0 %}stat-card-red{% else %}stat-card-neutral{% endif %}">
+            <div class="card-body">
+                <div class="stat-label">Net Profit</div>
+                <div class="stat-value {% if total_profit > 0 %}profit-positive{% elif total_profit < 0 %}profit-negative{% endif %}">
+                    {{ total_profit|currency }}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <!-- Left column: bar chart + monthly table -->
+    <div class="col-lg-8 d-flex flex-column gap-3">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-bar-chart"></i> Monthly Revenue vs. Costs
+            </div>
+            <div class="card-body">
+                <canvas id="monthlyChart" height="280"></canvas>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-calendar3"></i> Monthly Profit Breakdown
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>Month</th>
+                                <th class="text-end">Revenue</th>
+                                <th class="text-end">Payroll</th>
+                                <th class="text-end">Expenses</th>
+                                <th class="text-end">Net Profit</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for m in monthly_data %}
+                            {% if m.income > 0 or m.payroll > 0 or m.expenses > 0 %}
+                            <tr>
+                                <td class="fw-bold">{{ m.month }}</td>
+                                <td class="text-end">{{ m.income|currency }}</td>
+                                <td class="text-end">{{ m.payroll|currency }}</td>
+                                <td class="text-end">{{ m.expenses|currency }}</td>
+                                <td class="text-end {% if m.profit > 0 %}profit-positive{% elif m.profit < 0 %}profit-negative{% endif %}">
+                                    {{ m.profit|currency }}
+                                </td>
+                            </tr>
+                            {% endif %}
+                            {% endfor %}
+                        </tbody>
+                        <tfoot>
+                            <tr class="table-light">
+                                <td class="fw-bold">Total</td>
+                                <td class="text-end fw-bold">{{ total_income|currency }}</td>
+                                <td class="text-end fw-bold">{{ total_payroll|currency }}</td>
+                                <td class="text-end fw-bold">{{ total_expenses|currency }}</td>
+                                <td class="text-end fw-bold {% if total_profit > 0 %}profit-positive{% elif total_profit < 0 %}profit-negative{% endif %}">
+                                    {{ total_profit|currency }}
+                                </td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Right column: revenue breakdown + expense breakdown -->
+    <div class="col-lg-4 d-flex flex-column gap-3">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-clipboard-check"></i> Revenue by Service Type
+            </div>
+            <div class="card-body">
+                {% for s in service_breakdown %}
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div>
+                        <div class="fw-bold">{{ s.type }}</div>
+                        <small class="text-muted">{{ s.count }} service(s)</small>
+                    </div>
+                    <div class="fw-bold">{{ s.revenue|currency }}</div>
+                </div>
+                {% if not loop.last %}<hr class="my-0">{% endif %}
+                {% else %}
+                <p class="text-muted text-center mb-0">No data for {{ year }}</p>
+                {% endfor %}
+            </div>
+        </div>
+        <div class="card flex-grow-1">
+            <div class="card-header">
+                <i class="bi bi-pie-chart"></i> Expenses by Category
+            </div>
+            <div class="card-body">
+                {% if cat_labels %}
+                <canvas id="categoryChart" height="280"></canvas>
+                {% else %}
+                <p class="text-muted text-center mb-0 py-5">No expense data for {{ year }}</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<script>
+// Monthly Revenue vs. Costs bar/line chart
+const monthlyCtx = document.getElementById('monthlyChart');
+if (monthlyCtx) {
+    new Chart(monthlyCtx, {
+        type: 'bar',
+        data: {
+            labels: {{ chart_months|tojson }},
+            datasets: [
+                {
+                    label: 'Revenue',
+                    data: {{ chart_income|tojson }},
+                    backgroundColor: 'rgba(22, 163, 74, 0.7)',
+                    borderColor: 'rgba(22, 163, 74, 1)',
+                    borderWidth: 1,
+                    borderRadius: 4,
+                    order: 2
+                },
+                {
+                    label: 'Payroll',
+                    data: {{ chart_payroll|tojson }},
+                    backgroundColor: 'rgba(239, 68, 68, 0.7)',
+                    borderColor: 'rgba(239, 68, 68, 1)',
+                    borderWidth: 1,
+                    borderRadius: 4,
+                    order: 3
+                },
+                {
+                    label: 'Expenses',
+                    data: {{ chart_expenses|tojson }},
+                    backgroundColor: 'rgba(245, 158, 11, 0.7)',
+                    borderColor: 'rgba(245, 158, 11, 1)',
+                    borderWidth: 1,
+                    borderRadius: 4,
+                    order: 4
+                },
+                {
+                    label: 'Net Profit',
+                    data: {{ chart_profit|tojson }},
+                    type: 'line',
+                    borderColor: 'rgba(20, 83, 45, 1)',
+                    backgroundColor: 'rgba(20, 83, 45, 0.1)',
+                    borderWidth: 2,
+                    pointRadius: 4,
+                    pointBackgroundColor: 'rgba(20, 83, 45, 1)',
+                    fill: false,
+                    tension: 0.3,
+                    order: 1
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    labels: { font: { family: "'Inter', sans-serif", size: 12 }, padding: 16 }
+                },
+                tooltip: {
+                    backgroundColor: '#171717',
+                    titleFont: { family: "'Inter', sans-serif" },
+                    bodyFont: { family: "'Inter', sans-serif" },
+                    cornerRadius: 8,
+                    padding: 10,
+                    callbacks: {
+                        label: function(ctx) {
+                            return ctx.dataset.label + ': $' + ctx.parsed.y.toLocaleString('en-US', {minimumFractionDigits: 2});
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    grid: { color: 'rgba(0,0,0,0.04)' },
+                    ticks: {
+                        font: { family: "'Inter', sans-serif", size: 11 },
+                        callback: function(val) { return '$' + val.toLocaleString(); }
+                    }
+                },
+                x: {
+                    grid: { display: false },
+                    ticks: { font: { family: "'Inter', sans-serif", size: 11 } }
+                }
+            }
+        }
+    });
+}
+
+// Expense category doughnut chart
+{% if cat_labels %}
+const catCtx = document.getElementById('categoryChart');
+if (catCtx) {
+    const catColors = [
+        '#16a34a', '#f59e0b', '#3b82f6', '#ef4444', '#8b5cf6',
+        '#06b6d4', '#f97316', '#ec4899', '#22c55e', '#64748b'
+    ];
+    new Chart(catCtx, {
+        type: 'doughnut',
+        data: {
+            labels: {{ cat_labels|tojson }},
+            datasets: [{
+                data: {{ cat_amounts|tojson }},
+                backgroundColor: catColors.slice(0, {{ cat_labels|length }}),
+                borderWidth: 2,
+                borderColor: '#fff',
+                borderRadius: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout: '60%',
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        boxWidth: 12,
+                        padding: 12,
+                        font: { family: "'Inter', sans-serif", size: 11 }
+                    }
+                },
+                tooltip: {
+                    backgroundColor: '#171717',
+                    titleFont: { family: "'Inter', sans-serif" },
+                    bodyFont: { family: "'Inter', sans-serif" },
+                    cornerRadius: 8,
+                    padding: 10,
+                    callbacks: {
+                        label: function(ctx) {
+                            const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
+                            const pct = ((ctx.parsed / total) * 100).toFixed(1);
+                            return ctx.label + ': $' + ctx.parsed.toLocaleString('en-US', {minimumFractionDigits: 2}) + ' (' + pct + '%)';
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+{% endif %}
+</script>
+{% endblock %}

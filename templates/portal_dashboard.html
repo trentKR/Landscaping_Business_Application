@@ -1,0 +1,158 @@
+{% extends "portal_base.html" %}
+{% block title %}My Account - Clips{% endblock %}
+
+{% block content %}
+<h2 class="mb-4">
+    Welcome, {{ client.first_name }}
+</h2>
+
+<!-- Account balance card -->
+<div class="card shadow-sm mb-4">
+    <div class="card-body d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div>
+            <div class="detail-label">Account Balance</div>
+            <div class="stat-value {% if balance > 0 %}text-danger{% elif balance < 0 %}text-info{% else %}text-success{% endif %}">
+                {{ balance|currency }}
+            </div>
+            <div class="portal-help-text text-start">
+                {% if balance > 0 %}Amount due{% elif balance < 0 %}Credit on account{% else %}All paid up{% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Outstanding invoices -->
+<div class="card shadow-sm mb-4">
+    <div class="card-header">
+        Outstanding Invoices
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Invoice #</th>
+                        <th>Date</th>
+                        <th class="text-end">Amount</th>
+                        <th class="text-end">Balance Due</th>
+                        <th>Status</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for inv in outstanding_invoices %}
+                    <tr>
+                        <td>
+                            <a href="{{ url_for('portal.portal_invoice', invoice_id=inv.id) }}">
+                                {{ inv.invoice_number }}
+                            </a>
+                        </td>
+                        <td>{{ inv.invoice_date.strftime('%m/%d/%Y') }}</td>
+                        <td class="text-end">{{ inv.subtotal|currency }}</td>
+                        <td class="text-end fw-bold">{{ inv.balance_due|currency }}</td>
+                        <td><span class="badge {{ inv.status_class }}">{{ inv.status_display }}</span></td>
+                        <td class="text-end">
+                            {% if stripe_enabled and inv.balance_due > 0 %}
+                            <form method="post" action="{{ url_for('portal.portal_pay', invoice_id=inv.id) }}" class="d-inline">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-green btn-sm">Pay Now</button>
+                            </form>
+                            {% else %}
+                            <a href="{{ url_for('portal.portal_invoice', invoice_id=inv.id) }}" class="btn btn-outline-secondary btn-sm">View</a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" class="text-center text-muted py-4">
+                            No outstanding invoices. You're all caught up!
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Past invoices -->
+<div class="card shadow-sm mb-4">
+    <div class="card-header">
+        Past Invoices
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Invoice #</th>
+                        <th>Date</th>
+                        <th class="text-end">Amount</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for inv in paid_invoices %}
+                    <tr{% if loop.index > 10 %} class="d-none past-inv-hidden"{% endif %}>
+                        <td>
+                            <a href="{{ url_for('portal.portal_invoice', invoice_id=inv.id) }}">
+                                {{ inv.invoice_number }}
+                            </a>
+                        </td>
+                        <td>{{ inv.invoice_date.strftime('%m/%d/%Y') }}</td>
+                        <td class="text-end fw-bold">{{ inv.subtotal|currency }}</td>
+                        <td class="text-end">
+                            <a href="{{ url_for('portal.portal_invoice', invoice_id=inv.id) }}" class="btn btn-outline-secondary btn-sm">View</a>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="4" class="text-center text-muted py-4">No past invoices.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% if paid_invoices|length > 10 %}
+    <div class="card-footer bg-white text-center" id="past-inv-footer">
+        <button type="button" class="btn btn-link btn-sm text-decoration-none" onclick="document.querySelectorAll('.past-inv-hidden').forEach(r=>r.classList.remove('d-none','past-inv-hidden'));document.getElementById('past-inv-footer').remove();">
+            Show All ({{ paid_invoices|length }})
+        </button>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Recent payments -->
+<div class="card shadow-sm">
+    <div class="card-header">
+        Recent Payments
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Method</th>
+                        <th class="text-end">Amount</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in recent_payments %}
+                    <tr>
+                        <td>{{ p.payment_date.strftime('%m/%d/%Y') }}</td>
+                        <td>{{ p.method_display }}</td>
+                        <td class="text-end fw-bold">{{ p.amount|currency }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="3" class="text-center text-muted py-4">No payments on record.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

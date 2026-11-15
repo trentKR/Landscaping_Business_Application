@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Error {{ code }} - Clips{% endblock %}
+
+{# base.html only renders `content` for signed-in users, so the same body is
+   supplied to both blocks — otherwise an anonymous visitor hitting a bad URL
+   on the public site gets an empty page. #}
+{% macro error_body() %}
+<div class="text-center py-5 error-page">
+    <h1 class="display-1">{{ code }}</h1>
+    <p class="lead text-muted mt-2">{{ message }}</p>
+    {% if current_user.is_authenticated %}
+    <a href="{{ url_for('core.dashboard') }}" class="btn btn-green mt-3">
+        <i class="bi bi-house"></i> Back to Dashboard
+    </a>
+    {% else %}
+    <a href="{{ url_for('landing.home') }}" class="btn btn-green mt-3">
+        <i class="bi bi-house"></i> Back to Clips
+    </a>
+    {% endif %}
+</div>
+{% endmacro %}
+
+{% block content %}{{ error_body() }}{% endblock %}
+
+{% block unauthenticated %}
+<div class="container">{{ error_body() }}</div>
+{% endblock %}

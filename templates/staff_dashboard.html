@@ -1,0 +1,221 @@
+{% extends "staff_base.html" %}
+{% block title %}Timesheet - Employee Portal - Clips{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+        <h5 class="mb-0">
+            <i class="bi bi-calendar-week"></i>
+            <span class="d-none d-sm-inline">Week of {{ week_start.strftime('%b %d').replace(' 0', ' ') }} &ndash; {{ week_end.strftime('%b %d, %Y').replace(' 0', ' ') }}</span>
+            <span class="d-sm-none">{{ week_start.strftime('%b %d').replace(' 0', ' ') }} &ndash; {{ week_end.strftime('%b %d').replace(' 0', ' ') }}</span>
+        </h5>
+        <div class="d-flex gap-2">
+            <a href="{{ url_for('staff.staff_timesheet', week=prev_week) }}"
+               class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-chevron-left"></i> Prev
+            </a>
+            {% if show_next %}
+            <a href="{{ url_for('staff.staff_timesheet', week=next_week) }}"
+               class="btn btn-outline-secondary btn-sm">
+                Next <i class="bi bi-chevron-right"></i>
+            </a>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if rate_warning %}
+    <div class="alert alert-warning py-2">
+        <i class="bi bi-exclamation-triangle"></i>
+        Your hourly rate is set to $0.00. Contact your admin to update it.
+    </div>
+    {% endif %}
+
+    <form method="POST" action="{{ url_for('staff.staff_timesheet_submit') }}" id="timesheetForm">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="week_start" value="{{ week_start.isoformat() }}">
+
+        <div class="card shadow-sm">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0 align-middle staff-timesheet">
+                    <thead>
+                        <tr>
+                            <th style="width:110px">Day</th>
+                            <th style="width:80px">Date</th>
+                            <th style="width:130px">Start</th>
+                            <th style="width:130px">End</th>
+                            <th style="width:70px">Hours</th>
+                            <th style="width:90px">Rate</th>
+                            <th style="width:90px">Pay</th>
+                            <th>Notes</th>
+                            <th style="width:90px">Status</th>
+                            <th style="width:50px"></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for day in days %}
+                        <tr>
+                            <td class="fw-medium" data-label="Day">{{ day.day_name }}</td>
+                            <td data-label="Date">{{ day.date.strftime('%m/%d') }}</td>
+                            <td data-label="Start">
+                                <input type="time" class="form-control form-control-sm timesheet-time timesheet-start"
+                                       name="start_time_{{ loop.index0 }}"
+                                       value="{{ day.start_time.strftime('%H:%M') if day.start_time else '' }}"
+                                       data-index="{{ loop.index0 }}">
+                            </td>
+                            <td data-label="End">
+                                <input type="time" class="form-control form-control-sm timesheet-time timesheet-end"
+                                       name="end_time_{{ loop.index0 }}"
+                                       value="{{ day.end_time.strftime('%H:%M') if day.end_time else '' }}"
+                                       data-index="{{ loop.index0 }}">
+                            </td>
+                            <td class="fw-medium td-hours-ro" data-label="Hours" data-index="{{ loop.index0 }}">
+                                <span class="day-hours">{{ '%.2f' % day.hours if day.hours else '' }}</span>
+                            </td>
+                            <td class="text-muted td-rate" data-label="Rate">${{ '%.2f' % day.rate }}</td>
+                            <td class="fw-medium day-pay" data-label="Pay" data-index="{{ loop.index0 }}">${{ '%.2f' % day.pay }}</td>
+                            <td class="td-notes" data-label="Notes">
+                                <input type="text" class="form-control form-control-sm"
+                                       name="notes_{{ loop.index0 }}" value="{{ day.notes }}"
+                                       placeholder="Optional">
+                            </td>
+                            <td data-label="Status">
+                                {% if day.status %}
+                                <span class="badge {{ 'badge-submitted' if day.status == 'submitted' else 'badge-approved' if day.status == 'approved' else 'badge-rejected' if day.status == 'rejected' else 'badge-draft' }}">
+                                    {{ day.status }}
+                                </span>
+                                {% else %}
+                                <span class="text-muted">&mdash;</span>
+                                {% endif %}
+                            </td>
+                            <td class="td-clear" data-label="">
+                                {% if day.status != 'approved' %}
+                                <button type="button" class="btn btn-sm btn-clear-day"
+                                        data-index="{{ loop.index0 }}"
+                                        data-date="{{ day.date_iso }}"
+                                        data-has-entry="{{ 'true' if day.has_entry else 'false' }}"
+                                        title="Clear this day">
+                                    <i class="bi bi-x-lg"></i>
+                                </button>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="card-footer d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <div class="fw-bold">
+                    Total: <span id="totalHours">{{ '%.2f' % total_hours }}</span>h &mdash; $<span id="totalPay">{{ '%.2f' % total_pay }}</span>
+                </div>
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-send"></i> Submit
+                </button>
+            </div>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function calcHours(startVal, endVal) {
+    if (!startVal || !endVal) return 0;
+    const [sh, sm] = startVal.split(':').map(Number);
+    const [eh, em] = endVal.split(':').map(Number);
+    let mins = (eh * 60 + em) - (sh * 60 + sm);
+    if (mins <= 0) return 0;
+    mins = Math.round(mins / 15) * 15;
+    return mins / 60;
+}
+
+function updateRow(idx) {
+    const startInput = document.querySelector(`.timesheet-start[data-index="${idx}"]`);
+    const endInput = document.querySelector(`.timesheet-end[data-index="${idx}"]`);
+    if (!startInput || !endInput) return;
+
+    const hours = calcHours(startInput.value, endInput.value);
+    const hoursSpan = document.querySelector(`.td-hours-ro[data-index="${idx}"] .day-hours`);
+    if (hoursSpan) hoursSpan.textContent = hours > 0 ? hours.toFixed(2) : '';
+
+    const rateStr = '{{ days[0].rate if days else 0 }}';
+    // Get rate from the row — stored per-day in the template
+    const row = startInput.closest('tr');
+    const rateTd = row.querySelector('.td-rate');
+    const rate = rateTd ? parseFloat(rateTd.textContent.replace('$', '')) || 0 : 0;
+
+    const pay = (hours * rate).toFixed(2);
+    const payTd = document.querySelector(`.day-pay[data-index="${idx}"]`);
+    if (payTd) payTd.textContent = '$' + pay;
+
+    updateTotals();
+}
+
+function updateTotals() {
+    let totalH = 0, totalP = 0;
+    for (let i = 0; i < 7; i++) {
+        const s = document.querySelector(`.timesheet-start[data-index="${i}"]`);
+        const e = document.querySelector(`.timesheet-end[data-index="${i}"]`);
+        if (!s || !e) continue;
+        const h = calcHours(s.value, e.value);
+        const row = s.closest('tr');
+        const rateTd = row.querySelector('.td-rate');
+        const rate = rateTd ? parseFloat(rateTd.textContent.replace('$', '')) || 0 : 0;
+        totalH += h;
+        totalP += h * rate;
+    }
+    document.getElementById('totalHours').textContent = totalH.toFixed(2);
+    document.getElementById('totalPay').textContent = totalP.toFixed(2);
+}
+
+document.querySelectorAll('.timesheet-time').forEach(input => {
+    input.addEventListener('input', () => updateRow(input.dataset.index));
+});
+
+// --- Clear day button ---
+const CLEAR_URL = "{{ url_for('staff.staff_timesheet_clear_day') }}";
+const CSRF_TOKEN = document.querySelector('meta[name="csrf-token"]').content;
+
+function clearRow(idx) {
+    const startInput = document.querySelector(`.timesheet-start[data-index="${idx}"]`);
+    const endInput = document.querySelector(`.timesheet-end[data-index="${idx}"]`);
+    const notesInput = document.querySelector(`input[name="notes_${idx}"]`);
+    if (startInput) startInput.value = '';
+    if (endInput) endInput.value = '';
+    if (notesInput) notesInput.value = '';
+    updateRow(idx);
+}
+
+document.querySelectorAll('.btn-clear-day').forEach(btn => {
+    btn.addEventListener('click', function() {
+        const idx = this.dataset.index;
+        const hasEntry = this.dataset.hasEntry === 'true';
+
+        if (hasEntry) {
+            this.disabled = true;
+            fetch(CLEAR_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
+                body: JSON.stringify({ date: this.dataset.date })
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    clearRow(idx);
+                    this.dataset.hasEntry = 'false';
+                    // Update status badge to dash
+                    const statusTd = this.closest('tr').querySelector('[data-label="Status"]');
+                    if (statusTd) statusTd.innerHTML = '<span class="text-muted">&mdash;</span>';
+                } else {
+                    alert(data.error || 'Could not clear.');
+                }
+            })
+            .catch(() => alert('Network error.'))
+            .finally(() => { this.disabled = false; });
+        } else {
+            clearRow(idx);
+        }
+    });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,122 @@
+{% extends "portal_base.html" %}
+{% block title %}{{ invoice.invoice_number }} - Clips{% endblock %}
+
+
+{% block content %}
+<div class="mb-3">
+    <a href="{{ url_for('portal.portal_dashboard') }}" class="back-link">
+        <i class="bi bi-arrow-left"></i> Back to Dashboard
+    </a>
+</div>
+
+<div class="inv-page">
+    <div class="inv-accent"></div>
+
+    <div class="inv-header">
+        <div class="inv-header-logo">
+            <img src="{{ url_for('static', filename='logo_green.png') }}" alt="Clips Landscaping Services">
+        </div>
+        <div style="text-align: right;">
+            <div class="inv-label">Invoice</div>
+            <div class="inv-number">{{ invoice.invoice_number }}</div>
+        </div>
+    </div>
+
+    <div class="inv-meta">
+        <div class="inv-bill-to">
+            <div class="inv-section-label">Bill To</div>
+            <div class="inv-client-name">{{ client.full_name }}</div>
+            <div class="inv-client-detail">{{ client.full_address }}</div>
+        </div>
+        <table class="inv-dates-table">
+            <tr>
+                <td class="dt-label">Invoice Date</td>
+                <td class="dt-value">{{ invoice.invoice_date.strftime('%m/%d/%Y') }}</td>
+            </tr>
+        </table>
+    </div>
+
+    <div class="inv-body">
+        <table class="inv-items">
+            <thead>
+                <tr>
+                    <th>Description</th>
+                    <th class="col-date">Date</th>
+                    <th>Amount</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for li in invoice.line_items %}
+                <tr>
+                    <td>{{ li.service.description if li.service and li.service.service_type == 'other' and li.service.description else (li.service.service_type_display if li.service else li.description) }}</td>
+                    <td class="col-date">{{ li.service.service_date.strftime('%m/%d/%Y') if li.service else '' }}</td>
+                    <td>{{ li.amount|currency }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="inv-totals">
+        <div class="inv-totals-inner">
+            <div class="inv-totals-row">
+                <span class="tl">Invoice Total</span>
+                <span class="tv">{{ invoice.subtotal|currency }}</span>
+            </div>
+            {% if invoice.status == 'paid' %}
+            <div class="inv-balance-row inv-paid-bar">
+                <span class="tl"><i class="bi bi-check-circle-fill"></i> Paid in Full</span>
+            </div>
+            {% else %}
+            {% if invoice.amount_paid > 0 %}
+            <div class="inv-totals-row payment">
+                <span class="tl">Payments Received</span>
+                <span class="tv">-{{ invoice.amount_paid|currency }}</span>
+            </div>
+            {% endif %}
+            {% if outstanding %}
+            <div class="inv-outstanding">
+                <div class="inv-outstanding-label">Outstanding Invoices</div>
+                {% for number, amount in outstanding %}
+                <div class="inv-outstanding-item">
+                    <span>{{ number }}</span>
+                    <span>{{ amount|currency }}</span>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+            <div class="inv-balance-row">
+                <span class="tl">Account Balance</span>
+                <span class="tv">{{ invoice.client.account_balance()|currency }}</span>
+                <span class="inv-balance-note">as of {{ today.strftime('%B') }} {{ today.day }}, {{ today.year }}</span>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="inv-footer-section">
+        {% if invoice.balance_due > 0 and stripe_enabled %}
+        <form method="post" action="{{ url_for('portal.portal_pay', invoice_id=invoice.id) }}" class="mb-3">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-green btn-lg w-100">
+                <i class="bi bi-credit-card"></i> Pay {{ invoice.client.account_balance()|currency }} Now
+            </button>
+        </form>
+        {% elif invoice.balance_due <= 0 %}
+        <div class="text-center mb-3 inv-paid-message">
+            <i class="bi bi-check-circle-fill"></i> This invoice is paid in full. Thank you!
+        </div>
+        {% endif %}
+        <div class="ways-to-pay">
+            <h4>Ways to Pay</h4>
+            <div class="wtp-grid">
+                <span class="wtp-label">Cash</span><span class="wtp-value"></span>
+                <span class="wtp-label">Check</span><span class="wtp-value">{{ config.PAYMENT_NAME }}</span>
+                <span class="wtp-label">Venmo</span><span class="wtp-value">{{ config.VENMO_HANDLE }}</span>
+                <span class="wtp-label">Cash App</span><span class="wtp-value">{{ config.CASHAPP_HANDLE }}</span>
+                <span class="wtp-label">Zelle</span><span class="wtp-value">{{ config.ZELLE_PHONE }}</span>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

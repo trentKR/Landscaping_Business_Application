@@ -1,0 +1,240 @@
+{% extends "base.html" %}
+{% block title %}Invoices - Clips Admin{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <h1><i class="bi bi-receipt"></i> Invoices</h1>
+    <div class="d-flex gap-2">
+        <button type="button" id="select-toggle" class="btn btn-outline-secondary"
+                onclick="toggleSelectMode()">
+            <i class="bi bi-check-square"></i> Select
+        </button>
+        <a href="{{ url_for('invoices.invoice_quick_create') }}" class="btn btn-green">
+            <i class="bi bi-plus-circle"></i> Create Invoice
+        </a>
+    </div>
+</div>
+
+<!-- Filters -->
+<div class="card shadow-sm mb-3">
+    <div class="card-body py-2">
+        <form method="GET" class="row g-2 align-items-end">
+            <div class="col-md-3">
+                <input type="text" class="form-control" name="search"
+                       placeholder="Search by client name" value="{{ search }}">
+            </div>
+            <div class="col-md-2">
+                <div class="dropdown">
+                    <button class="dropdown-toggle filter-select w-100 text-start"
+                            type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside"
+                            id="statusDropdown">
+                        {% if status_filter|length == 0 %}All Statuses
+                        {% elif status_filter|length == 1 %}{{ status_filter[0]|capitalize }}
+                        {% else %}{{ status_filter|length }} selected{% endif %}
+                    </button>
+                    <div class="dropdown-menu p-2" style="min-width: 160px;">
+                        {% for val, label in [('unpaid','Unpaid'),('partial','Partial'),('paid','Paid'),('void','Void')] %}
+                        <label class="dropdown-item d-flex align-items-center gap-2 px-2 py-1">
+                            <input type="checkbox" name="status" value="{{ val }}"
+                                   {% if val in status_filter %}checked{% endif %}
+                                   onchange="updateStatusLabel()">
+                            {{ label }}
+                        </label>
+                        {% endfor %}
+                        <div class="dropdown-divider"></div>
+                        <button type="submit" class="btn btn-green btn-sm w-100">Apply</button>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <input type="date" class="form-control" name="date_from" value="{{ date_from }}">
+            </div>
+            <div class="col-md-2">
+                <input type="date" class="form-control" name="date_to" value="{{ date_to }}">
+            </div>
+            <div class="col-md-3 d-flex gap-2">
+                <button type="submit" class="btn btn-green">
+                    <i class="bi bi-search"></i> Filter
+                </button>
+                <a href="{{ url_for('invoices.invoice_list') }}" class="btn btn-outline-secondary">Clear</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Bulk action bar -->
+<div id="bulk-action-bar" class="d-none mb-2 d-flex gap-2 flex-wrap">
+    <form method="POST" action="{{ url_for('invoices.invoice_bulk_email') }}" id="bulk-email-form"
+          onsubmit="return confirmBulkAction('Email', 'bulk-email-form')">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="bulk-ids-container"></div>
+        <button type="submit" class="btn btn-green btn-sm">
+            <i class="bi bi-envelope"></i> Email Selected (<span class="selected-count">0</span>)
+        </button>
+    </form>
+    <form method="POST" action="{{ url_for('invoices.invoice_bulk_void') }}" id="bulk-void-form"
+          onsubmit="return confirmBulkAction('Void', 'bulk-void-form')">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="bulk-ids-container"></div>
+        <button type="submit" class="btn btn-warning btn-sm">
+            <i class="bi bi-x-circle"></i> Void Selected (<span class="selected-count">0</span>)
+        </button>
+    </form>
+    <form method="POST" action="{{ url_for('invoices.invoice_bulk_delete') }}" id="bulk-delete-form"
+          onsubmit="return confirmBulkAction('Delete', 'bulk-delete-form')">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="bulk-ids-container"></div>
+        <button type="submit" class="btn btn-danger btn-sm" id="bulk-delete-btn" disabled
+                title="Only void invoices can be deleted">
+            <i class="bi bi-trash"></i> Delete Selected (<span class="selected-count">0</span>)
+        </button>
+    </form>
+</div>
+
+<!-- Invoice table -->
+<div class="card shadow-sm">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th class="select-col d-none" style="width:36px">
+                            <input type="checkbox" id="select-all" onclick="toggleAll(this)">
+                        </th>
+                        <th>Invoice #</th>
+                        <th>Client</th>
+                        <th>Date</th>
+                        <th class="text-end">Amount</th>
+                        <th class="text-end">Paid</th>
+                        <th class="text-end">Balance</th>
+                        <th>Status</th>
+                        <th class="d-none d-md-table-cell">Last Emailed</th>
+                        <th class="action-col"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for inv in invoices %}
+                    <tr>
+                        <td class="select-col d-none">
+                            <input type="checkbox" value="{{ inv.id }}"
+                                   class="row-checkbox" data-status="{{ inv.status }}" onchange="updateCount()">
+                        </td>
+                        <td>
+                            <a href="{{ url_for('invoices.invoice_detail', invoice_id=inv.id) }}" class="fw-bold">
+                                {{ inv.invoice_number }}
+                            </a>
+                        </td>
+                        <td>
+                            <a href="{{ url_for('clients.client_detail', client_id=inv.client_id) }}">
+                                {{ inv.client.full_name }}
+                            </a>
+                        </td>
+                        <td>{{ inv.invoice_date.strftime('%m/%d/%Y') }}</td>
+                        <td class="text-end">{{ inv.subtotal|currency }}</td>
+                        <td class="text-end">{{ inv.amount_paid|currency }}</td>
+                        <td class="text-end fw-bold">{{ inv.balance_due|currency }}</td>
+                        <td><span class="badge {{ inv.status_class }}">{{ inv.status_display }}</span></td>
+                        <td class="d-none d-md-table-cell text-muted small">
+                            {% if inv.sent_at %}{{ inv.sent_at|eastern }}{% else %}&mdash;{% endif %}
+                        </td>
+                        <td class="action-col">
+                            {% if inv.status == 'void' %}
+                            <form method="POST" action="{{ url_for('invoices.invoice_delete', invoice_id=inv.id) }}" class="d-inline">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-outline-danger btn-sm"
+                                    aria-label="Delete {{ inv.invoice_number }}"
+                                    onclick="return confirm('Are you sure you want to delete {{ inv.invoice_number }}? This cannot be undone.')">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
+                            {% else %}
+                            <a href="{{ url_for('invoices.invoice_detail', invoice_id=inv.id) }}"
+                               class="btn btn-sm btn-outline-secondary" aria-label="View {{ inv.invoice_number }}">
+                                <i class="bi bi-arrow-right"></i>
+                            </a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="10">
+                            <div class="empty-state">
+                                <i class="bi bi-receipt"></i>
+                                <h5>No invoices found</h5>
+                                <p>Try adjusting your filter criteria or create a new invoice.</p>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% if invoices %}
+    <div class="card-footer d-flex justify-content-between">
+        <span class="text-muted small">{{ invoices|length }} invoice(s)</span>
+        <span class="fw-bold">Total Outstanding: {{ total_outstanding|currency }}</span>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+function updateStatusLabel() {
+    const checked = document.querySelectorAll('#statusDropdown + .dropdown-menu input:checked');
+    const btn = document.getElementById('statusDropdown');
+    if (checked.length === 0) btn.textContent = 'All Statuses';
+    else if (checked.length === 1) btn.textContent = checked[0].parentElement.textContent.trim();
+    else btn.textContent = checked.length + ' selected';
+}
+
+function toggleSelectMode() {
+    const active = document.body.classList.toggle('select-mode');
+    document.querySelectorAll('.select-col').forEach(el => el.classList.toggle('d-none', !active));
+    document.querySelectorAll('.action-col').forEach(el => el.classList.toggle('d-none', active));
+    document.getElementById('bulk-action-bar').classList.toggle('d-none', !active);
+    const btn = document.getElementById('select-toggle');
+    btn.innerHTML = active
+        ? '<i class="bi bi-x-lg"></i> Cancel'
+        : '<i class="bi bi-check-square"></i> Select';
+    if (!active) {
+        document.querySelectorAll('.row-checkbox').forEach(cb => cb.checked = false);
+        document.getElementById('select-all').checked = false;
+        updateCount();
+    }
+}
+
+function toggleAll(master) {
+    document.querySelectorAll('.row-checkbox').forEach(cb => cb.checked = master.checked);
+    updateCount();
+}
+
+function updateCount() {
+    const checked = document.querySelectorAll('.row-checkbox:checked');
+    const n = checked.length;
+    document.querySelectorAll('.selected-count').forEach(el => el.textContent = n);
+    const delBtn = document.getElementById('bulk-delete-btn');
+    const allVoid = n > 0 && [...checked].every(cb => cb.dataset.status === 'void');
+    delBtn.disabled = !allVoid;
+    delBtn.title = allVoid ? '' : 'Only void invoices can be deleted';
+}
+
+function confirmBulkAction(action, formId) {
+    const checkboxes = document.querySelectorAll('.row-checkbox:checked');
+    const n = checkboxes.length;
+    if (n === 0) { alert('No invoices selected.'); return false; }
+    if (!confirm(`${action} ${n} invoice(s)?`)) return false;
+
+    const form = document.getElementById(formId);
+    const container = form.querySelector('.bulk-ids-container');
+    container.innerHTML = '';
+    checkboxes.forEach(cb => {
+        const hidden = document.createElement('input');
+        hidden.type = 'hidden';
+        hidden.name = 'invoice_ids[]';
+        hidden.value = cb.value;
+        container.appendChild(hidden);
+    });
+    return true;
+}
+</script>
+{% endblock %}

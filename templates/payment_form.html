@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% block title %}{% if payment %}Edit Payment{% else %}Record Payment{% endif %} - Clips Admin{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1><i class="bi bi-cash-stack"></i> {% if payment %}Edit Payment{% else %}Record Payment{% endif %}</h1>
+</div>
+
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card shadow-sm">
+            <div class="card-header form-card-header">
+                {% if payment %}Edit Payment{% else %}Record Payment{% endif %}
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Client <span class="text-danger">*</span></label>
+                            {% if payment %}
+                            <div class="form-control bg-light">
+                                <a href="{{ url_for('clients.client_detail', client_id=payment.client_id) }}">
+                                    {{ payment.client.full_name }}
+                                </a>
+                            </div>
+                            {% else %}
+                            <select class="form-select" name="client_id" id="clientSelect" required>
+                                <option value="">Select a client...</option>
+                                {% for c in clients %}
+                                <option value="{{ c.id }}" {% if preselect_client == c.id %}selected{% endif %}>
+                                    {{ c.full_name }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Payment Date</label>
+                            <input type="date" class="form-control" name="payment_date"
+                                   value="{{ payment.payment_date.isoformat() if payment else today.isoformat() }}" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Amount <span class="text-danger">*</span></label>
+                            <div class="input-group">
+                                <span class="input-group-text">$</span>
+                                <input type="number" class="form-control" name="amount" step="0.01" min="0.01"
+                                       value="{{ '%.2f'|format(payment.amount) if payment else '' }}" required>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Payment Method</label>
+                            <select class="form-select" name="payment_method" required>
+                                {% for val, label in payment_methods %}
+                                <option value="{{ val }}" {% if payment and payment.payment_method == val %}selected{% endif %}>{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Reference / Check #</label>
+                            <input type="text" class="form-control" name="reference"
+                                   placeholder="e.g. Check #1234"
+                                   value="{{ payment.reference if payment else '' }}">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Notes</label>
+                            <textarea class="form-control" name="notes" rows="2">{{ payment.notes if payment else '' }}</textarea>
+                        </div>
+                    </div>
+
+                    {% if not payment %}
+                    <!-- Balance info (new payment only) -->
+                    <div id="balanceInfo" class="mt-3 p-3 bg-light rounded" style="display:none;">
+                        <div class="d-flex justify-content-between mb-1">
+                            <span>Account Balance:</span>
+                            <strong id="accountBalance">$0.00</strong>
+                        </div>
+                        <div class="d-flex justify-content-between">
+                            <span>Unapplied Credit:</span>
+                            <strong id="unappliedCredit">$0.00</strong>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <hr>
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-green">
+                            <i class="bi bi-check-lg"></i> {% if payment %}Save Changes{% else %}Create Payment{% endif %}
+                        </button>
+                        {% if payment %}
+                        <a href="{{ url_for('payments.payment_detail', payment_id=payment.id) }}" class="btn btn-outline-secondary">Cancel</a>
+                        {% else %}
+                        <a href="{{ url_for('payments.payment_list') }}" class="btn btn-outline-secondary">Cancel</a>
+                        {% endif %}
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% if not payment %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const clientSelect = document.getElementById('clientSelect');
+    const balanceInfo = document.getElementById('balanceInfo');
+    const accountBalance = document.getElementById('accountBalance');
+    const unappliedCredit = document.getElementById('unappliedCredit');
+
+    function loadBalance(clientId) {
+        if (!clientId) {
+            balanceInfo.style.display = 'none';
+            return;
+        }
+        fetch('{{ url_for("clients.api_client_balance", client_id=0) }}'.replace('/0', '/' + clientId))
+            .then(r => r.json())
+            .then(data => {
+                accountBalance.textContent = '$' + data.balance.toFixed(2);
+                unappliedCredit.textContent = '$' + data.unapplied_credit.toFixed(2);
+                balanceInfo.style.display = '';
+            });
+    }
+
+    clientSelect.addEventListener('change', function() {
+        loadBalance(this.value);
+    });
+
+    if (clientSelect.value) {
+        loadBalance(clientSelect.value);
+    }
+});
+</script>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,327 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit Expense' if expense else 'Add Expense' }} - Clips Admin{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>
+        <i class="bi bi-cash-coin"></i>
+        {{ 'Edit Expense' if expense else 'Add Expense' }}
+    </h1>
+</div>
+
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card shadow-sm">
+            <div class="card-header form-card-header">
+                {{ 'Edit Expense' if expense else 'Add Expense' }}
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <div class="row g-3">
+                        <!-- Date -->
+                        <div class="col-md-4">
+                            <label class="form-label">Date <span class="text-danger">*</span></label>
+                            <input type="date" class="form-control" name="expense_date" required
+                                   value="{{ expense.expense_date.isoformat() if expense else today.isoformat() }}">
+                        </div>
+
+                        <!-- Amount -->
+                        <div class="col-md-4">
+                            <label class="form-label">Amount <span class="text-danger">*</span></label>
+                            <div class="input-group">
+                                <span class="input-group-text">$</span>
+                                <input type="number" class="form-control" name="amount" step="0.01" min="0.01" required
+                                       value="{{ expense.amount if expense else '' }}" placeholder="0.00">
+                            </div>
+                        </div>
+
+                        <!-- Payment Method -->
+                        <div class="col-md-4">
+                            <label class="form-label">Payment Method <span class="text-danger">*</span></label>
+                            <select class="form-select" name="payment_method" required>
+                                {% for val, label in payment_methods %}
+                                <option value="{{ val }}"
+                                    {% if expense and expense.payment_method == val %}selected{% endif %}
+                                    {% if not expense and val == 'credit_card' %}selected{% endif %}>
+                                    {{ label }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <!-- Category -->
+                        <div class="col-md-6">
+                            <label class="form-label">Category <span class="text-danger">*</span></label>
+                            <select class="form-select" name="category_id" required>
+                                <option value="">Select a category...</option>
+                                {% for cat in categories %}
+                                <option value="{{ cat.id }}"
+                                    {% if expense and expense.category_id == cat.id %}selected{% endif %}>
+                                    {{ cat.name }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <!-- Vendor -->
+                        <div class="col-md-6">
+                            <label class="form-label">Vendor</label>
+                            <select class="form-select" name="vendor_id" id="vendorSelect">
+                                <option value="">No vendor</option>
+                                {% for v in vendors %}
+                                <option value="{{ v.id }}"
+                                    {% if expense and expense.vendor_id == v.id %}selected{% endif %}>
+                                    {{ v.name }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <!-- Description -->
+                        <div class="col-12">
+                            <label class="form-label">Description</label>
+                            <input type="text" class="form-control" name="description"
+                                   value="{{ expense.description if expense else '' }}"
+                                   placeholder="e.g., 10 bags mulch for spring jobs">
+                        </div>
+
+                        <!-- Client attribution -->
+                        <div class="col-12" id="splitContainer">
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="checkbox" id="splitToggle" name="split_mode"
+                                       {% if expense and expense.is_split %}checked{% endif %}>
+                                <label class="form-check-label fw-semibold" for="splitToggle">
+                                    Split this expense across multiple clients
+                                </label>
+                            </div>
+
+                            <!-- Single client (default) -->
+                            <div id="singleClientSection" class="{% if expense and expense.is_split %}d-none{% endif %}">
+                                <label class="form-label">Link to Client <small class="text-muted">(optional)</small></label>
+                                <select class="form-select" name="client_id" id="singleClientSelect">
+                                    <option value="">Not linked to a client</option>
+                                    {% for c in clients %}
+                                    <option value="{{ c.id }}"
+                                        {% if expense and not expense.is_split and expense.client_id == c.id %}selected{% endif %}>
+                                        {{ c.full_name }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                            <!-- Split clients -->
+                            <div id="splitSection" class="{% if not (expense and expense.is_split) %}d-none{% endif %}">
+                                <table class="table table-sm mb-2" id="splitTable">
+                                    <thead>
+                                        <tr>
+                                            <th>Client</th>
+                                            <th style="width:140px">Amount</th>
+                                            <th style="width:40px"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="splitRows">
+                                        {% if expense and expense.is_split %}
+                                        {% for a in expense.allocations %}
+                                        <tr class="split-row">
+                                            <td>
+                                                <select class="form-select form-select-sm" name="alloc_client_id[]" required>
+                                                    <option value="">Select a client...</option>
+                                                    {% for c in clients %}
+                                                    <option value="{{ c.id }}" {% if c.id == a.client_id %}selected{% endif %}>{{ c.full_name }}</option>
+                                                    {% endfor %}
+                                                </select>
+                                            </td>
+                                            <td>
+                                                <div class="input-group input-group-sm">
+                                                    <span class="input-group-text">$</span>
+                                                    <input type="number" class="form-control alloc-amount" name="alloc_amount[]"
+                                                           step="0.01" min="0.01" value="{{ a.amount }}" required>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <button type="button" class="btn btn-sm btn-outline-danger remove-row">&times;</button>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                        {% endif %}
+                                    </tbody>
+                                </table>
+                                <div class="d-flex gap-2 align-items-center">
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" id="addRowBtn">
+                                        <i class="bi bi-plus"></i> Add Client
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" id="splitEquallyBtn">
+                                        = Split Equally
+                                    </button>
+                                    <span class="text-muted small ms-2" id="allocTotals"></span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Refund checkbox -->
+                        <div class="col-md-6 d-flex align-items-end">
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="checkbox" name="is_refund" id="isRefund"
+                                       {% if expense and expense.is_refund %}checked{% endif %}>
+                                <label class="form-check-label" for="isRefund">
+                                    This is a refund / return
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr>
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-green">
+                            <i class="bi bi-check-lg"></i>
+                            {{ 'Save Changes' if expense else 'Create Expense' }}
+                        </button>
+                        <a href="{{ url_for('expenses.expense_list') }}" class="btn btn-outline-secondary">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick tips sidebar -->
+    <div class="col-lg-4">
+        <div class="card shadow-sm">
+            <div class="card-header form-card-header">
+                <i class="bi bi-lightbulb"></i> Tips
+            </div>
+            <div class="card-body small">
+                <ul class="mb-0">
+                    <li class="mb-2"><strong>Link to Client</strong> to track job-level profitability for that customer.</li>
+                    <li class="mb-2"><strong>Split across clients</strong> when one expense (e.g., equipment rental) is shared across multiple jobs.</li>
+                    <li class="mb-2"><strong>Refunds</strong> are subtracted from expense totals in reports.</li>
+                    <li>Use <strong>specific categories</strong> for better reporting (e.g., "Mulch" under Materials instead of just "Materials").</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function () {
+    const toggle = document.getElementById('splitToggle');
+    const splitContainer = document.getElementById('splitContainer');
+    const singleSection = document.getElementById('singleClientSection');
+    const splitSection = document.getElementById('splitSection');
+    const splitRows = document.getElementById('splitRows');
+    const addRowBtn = document.getElementById('addRowBtn');
+    const splitEquallyBtn = document.getElementById('splitEquallyBtn');
+    const amountInput = document.querySelector('input[name="amount"]');
+    const totalsSpan = document.getElementById('allocTotals');
+    const categorySelect = document.querySelector('select[name="category_id"]');
+
+    // Categories for which split is available
+    const splitAllowedIds = new Set([
+        {% for cat in categories if cat.name in ['Equipment Rental', 'Materials', 'Other'] %}{{ cat.id }},{% endfor %}
+    ]);
+
+    function checkSplitAllowed() {
+        const allowed = splitAllowedIds.has(parseInt(categorySelect.value));
+        if (allowed) {
+            splitContainer.classList.remove('d-none');
+        } else {
+            splitContainer.classList.add('d-none');
+            // Clear client selection so hidden fields don't submit stale values
+            document.getElementById('singleClientSelect').value = '';
+            toggle.checked = false;
+            singleSection.classList.remove('d-none');
+            splitSection.classList.add('d-none');
+        }
+    }
+
+    categorySelect.addEventListener('change', checkSplitAllowed);
+    checkSplitAllowed();
+
+    // Build client options HTML from server-rendered select
+    const sourceOptions = document.getElementById('singleClientSelect')
+        ? document.getElementById('singleClientSelect').innerHTML
+        : '';
+
+    function updateTotals() {
+        const amtInputs = splitRows.querySelectorAll('.alloc-amount');
+        const allocated = Array.from(amtInputs).reduce((s, i) => s + (parseFloat(i.value) || 0), 0);
+        const total = parseFloat(amountInput.value) || 0;
+        totalsSpan.textContent = `Allocated: $${allocated.toFixed(2)} of $${total.toFixed(2)}`;
+    }
+
+    function addRow(clientId, amount) {
+        const tr = document.createElement('tr');
+        tr.className = 'split-row';
+        tr.innerHTML = `
+            <td>
+                <select class="form-select form-select-sm" name="alloc_client_id[]" required>
+                    ${sourceOptions}
+                </select>
+            </td>
+            <td>
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text">$</span>
+                    <input type="number" class="form-control alloc-amount" name="alloc_amount[]"
+                           step="0.01" min="0.01" placeholder="0.00" required>
+                </div>
+            </td>
+            <td>
+                <button type="button" class="btn btn-sm btn-outline-danger remove-row">&times;</button>
+            </td>`;
+        if (clientId) tr.querySelector('select').value = clientId;
+        if (amount)   tr.querySelector('.alloc-amount').value = amount;
+        splitRows.appendChild(tr);
+        tr.querySelector('.alloc-amount').addEventListener('input', updateTotals);
+        tr.querySelector('.remove-row').addEventListener('click', function () {
+            tr.remove();
+            updateTotals();
+        });
+        updateTotals();
+    }
+
+    // Wire up existing rows
+    splitRows.querySelectorAll('.split-row').forEach(function (tr) {
+        tr.querySelector('.alloc-amount').addEventListener('input', updateTotals);
+        tr.querySelector('.remove-row').addEventListener('click', function () {
+            tr.remove();
+            updateTotals();
+        });
+    });
+
+    toggle.addEventListener('change', function () {
+        if (this.checked) {
+            singleSection.classList.add('d-none');
+            splitSection.classList.remove('d-none');
+            if (splitRows.querySelectorAll('.split-row').length === 0) {
+                addRow(); addRow();
+            }
+        } else {
+            singleSection.classList.remove('d-none');
+            splitSection.classList.add('d-none');
+        }
+        updateTotals();
+    });
+
+    addRowBtn.addEventListener('click', function () { addRow(); });
+
+    splitEquallyBtn.addEventListener('click', function () {
+        const rows = splitRows.querySelectorAll('.alloc-amount');
+        if (!rows.length) return;
+        const total = parseFloat(amountInput.value) || 0;
+        const share = Math.round((total / rows.length) * 100) / 100;
+        // Give any rounding remainder to the last row
+        rows.forEach(function (inp, i) {
+            inp.value = (i === rows.length - 1)
+                ? (Math.round((total - share * (rows.length - 1)) * 100) / 100).toFixed(2)
+                : share.toFixed(2);
+        });
+        updateTotals();
+    });
+
+    amountInput.addEventListener('input', updateTotals);
+
+    // Init totals on load
+    updateTotals();
+})();
+</script>
+{% endblock %}

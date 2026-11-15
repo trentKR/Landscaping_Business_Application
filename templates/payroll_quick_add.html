@@ -1,0 +1,293 @@
+{% extends "base.html" %}
+{% block title %}Quick Add Payroll - Clips Admin{% endblock %}
+
+{% macro payroll_row(idx) %}
+<tr class="payroll-row">
+    <td data-label="Date">
+        <input type="hidden" name="row_index" value="{{ idx }}">
+        <input type="date" class="form-control form-control-sm"
+               name="work_date_{{ idx }}" data-field="work_date"
+               value="{{ today.isoformat() }}">
+        <div class="invalid-feedback"></div>
+    </td>
+    <td data-label="Employee">
+        <select class="form-select form-select-sm" name="employee_id_{{ idx }}" data-field="employee_name">
+            <option value="">Employee...</option>
+            {% for e in employees %}
+            <option value="{{ e.id }}" data-rate="{{ e.default_hourly_rate }}">{{ e.last_name }}, {{ e.first_name }}</option>
+            {% endfor %}
+        </select>
+        <div class="invalid-feedback"></div>
+    </td>
+    <td data-label="Hours">
+        <input type="number" class="form-control form-control-sm text-end"
+               name="hours_{{ idx }}" data-field="hours"
+               step="0.25" min="0" placeholder="0" inputmode="decimal">
+        <div class="invalid-feedback"></div>
+    </td>
+    <td data-label="Rate">
+        <div class="input-group input-group-sm">
+            <span class="input-group-text">$</span>
+            <input type="number" class="form-control text-end"
+                   name="hourly_rate_{{ idx }}" data-field="hourly_rate"
+                   step="0.01" min="0" placeholder="0.00" inputmode="decimal">
+            <div class="invalid-feedback"></div>
+        </div>
+    </td>
+    <td data-label="Notes">
+        <input type="text" class="form-control form-control-sm" name="notes_{{ idx }}"
+               data-field="notes" maxlength="250" placeholder="Optional">
+    </td>
+    <td class="td-remove" data-label="">
+        <button type="button" class="btn btn-sm btn-outline-danger remove-row" aria-label="Remove row">&times;</button>
+    </td>
+</tr>
+{% endmacro %}
+
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <h1><i class="bi bi-lightning-fill"></i> Quick Add Payroll</h1>
+</div>
+<p class="text-muted small mb-3">Record payroll entries — a new row appears as you fill in the last one.</p>
+
+<form method="POST" id="quickAddForm" novalidate>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    <div class="alert alert-danger d-none" id="gridError" role="alert">
+        <i class="bi bi-exclamation-triangle-fill"></i> <span id="gridErrorText"></span>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0 quick-grid" style="min-width:860px">
+                    <thead>
+                        <tr>
+                            <th style="width:140px">Date</th>
+                            <th style="width:210px">Employee</th>
+                            <th style="width:100px">Hours</th>
+                            <th style="width:120px">Rate</th>
+                            <th>Notes</th>
+                            <th style="width:40px"></th>
+                        </tr>
+                    </thead>
+                    <tbody id="payrollRows">
+                        {% for i in range(blank_rows) %}{{ payroll_row(i) }}{% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td colspan="3" class="text-end">Total</td>
+                            <td class="text-end" id="gridTotal">$0.00</td>
+                            <td colspan="2"></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+        <div class="card-footer d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <button type="button" class="btn btn-sm btn-outline-secondary" id="addRowBtn">
+                <i class="bi bi-plus"></i> Add Row
+            </button>
+            <span class="text-muted small"><span id="filledCount">0</span> entries ready to save</span>
+        </div>
+    </div>
+
+    <div class="d-flex gap-2 mt-3">
+        <button type="submit" class="btn btn-green" id="saveBtn">
+            <i class="bi bi-check-lg"></i> Save All Entries
+        </button>
+        <a href="{{ url_for('payroll.payroll') }}" class="btn btn-outline-secondary">Cancel</a>
+    </div>
+</form>
+
+<template id="rowTemplate">{{ payroll_row('__INDEX__') }}</template>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+    const form      = document.getElementById('quickAddForm');
+    const tbody     = document.getElementById('payrollRows');
+    const tpl       = document.getElementById('rowTemplate');
+    const saveBtn   = document.getElementById('saveBtn');
+    const errBox    = document.getElementById('gridError');
+    const errText   = document.getElementById('gridErrorText');
+    const totalCell = document.getElementById('gridTotal');
+    const countCell = document.getElementById('filledCount');
+    const MAX_ROWS  = {{ max_rows }};
+    let nextIndex   = {{ blank_rows }};
+    let submitting  = false;
+
+    const field = (tr, name) => tr.querySelector('[data-field="' + name + '"]');
+
+    // Keep in lockstep with the blank-row test in payroll.payroll_quick_add.
+    const MEANINGFUL = ['employee_name', 'hours', 'hourly_rate'];
+    function rowIsBlank(tr) {
+        return MEANINGFUL.every(function (f) {
+            const el = field(tr, f);
+            return !el || !el.value.trim();
+        });
+    }
+
+    // ---- rows -------------------------------------------------------------
+    function addRow(inheritFrom) {
+        if (tbody.children.length >= MAX_ROWS) return null;
+        tbody.insertAdjacentHTML('beforeend',
+            tpl.innerHTML.replace(/__INDEX__/g, nextIndex++));
+        const tr = tbody.lastElementChild;
+        if (inheritFrom) {
+            field(tr, 'work_date').value = field(inheritFrom, 'work_date').value;
+        }
+        return tr;
+    }
+
+    function clearRow(tr) {
+        field(tr, 'employee_name').value = '';
+        field(tr, 'hours').value = '';
+        field(tr, 'hourly_rate').value = '';
+        field(tr, 'notes').value = '';
+        tr.querySelectorAll('.is-invalid').forEach(el => el.classList.remove('is-invalid'));
+    }
+
+    function ensureTrailingBlank() {
+        const last = tbody.lastElementChild;
+        if (!last || !rowIsBlank(last)) addRow(last);
+    }
+
+    // ---- employee autofill ------------------------------------------------
+    function applyEmployeeRate(tr) {
+        const sel  = field(tr, 'employee_name');
+        const rate = field(tr, 'hourly_rate');
+        const opt  = sel.selectedOptions[0];
+        const r    = opt ? parseFloat(opt.dataset.rate) : NaN;
+
+        if (sel.value && isFinite(r) && r > 0 && !rate.value.trim()) {
+            rate.value = r.toFixed(2);
+        }
+    }
+
+    // ---- totals -----------------------------------------------------------
+    function money(n) {
+        return (n < 0 ? '-$' : '$') + Math.abs(n)
+            .toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    }
+
+    function updateTotals() {
+        let total = 0, count = 0;
+        tbody.querySelectorAll('tr').forEach(function (tr) {
+            if (rowIsBlank(tr)) return;
+            count++;
+            const h = parseFloat(field(tr, 'hours').value) || 0;
+            const r = parseFloat(field(tr, 'hourly_rate').value) || 0;
+            total += h * r;
+        });
+        totalCell.textContent = money(total);
+        countCell.textContent = count;
+    }
+
+    // ---- delegated events -------------------------------------------------
+    function onEdit(e) {
+        const tr = e.target.closest('tr');
+        if (!tr) return;
+        e.target.classList.remove('is-invalid');
+        if (e.target.matches('[data-field="employee_name"]')) applyEmployeeRate(tr);
+        if (tr === tbody.lastElementChild && !rowIsBlank(tr)) addRow(tr);
+        updateTotals();
+    }
+    tbody.addEventListener('input', onEdit);
+    tbody.addEventListener('change', onEdit);
+
+    tbody.addEventListener('click', function (e) {
+        const btn = e.target.closest('.remove-row');
+        if (!btn) return;
+        const tr = btn.closest('tr');
+        if (tbody.children.length === 1) {
+            clearRow(tr);
+        } else {
+            tr.remove();
+        }
+        ensureTrailingBlank();
+        updateTotals();
+    });
+
+    tbody.addEventListener('wheel', function (e) {
+        if (e.target.matches('input[type="number"]:focus')) e.target.blur();
+    }, {passive: true});
+
+    document.getElementById('addRowBtn').addEventListener('click', function () {
+        const tr = addRow(tbody.lastElementChild);
+        if (tr) field(tr, 'employee_name').focus();
+    });
+
+    // ---- validation -------------------------------------------------------
+    function markInvalid(el, msg) {
+        el.classList.add('is-invalid');
+        const fb = el.parentElement.querySelector('.invalid-feedback');
+        if (fb) fb.textContent = msg;
+    }
+
+    function validateRow(tr) {
+        const bad = [];
+        const d = field(tr, 'work_date');
+        if (!d.value) { markInvalid(d, 'Required.'); bad.push(d); }
+
+        const emp = field(tr, 'employee_name');
+        if (!emp.value) { markInvalid(emp, 'Required.'); bad.push(emp); }
+
+        const h = field(tr, 'hours');
+        const hv = parseFloat(h.value);
+        if (!h.value.trim())    { markInvalid(h, 'Required.');      bad.push(h); }
+        else if (!isFinite(hv)) { markInvalid(h, 'Not a number.');  bad.push(h); }
+        else if (hv <= 0)       { markInvalid(h, 'Must be > 0.');   bad.push(h); }
+
+        const r = field(tr, 'hourly_rate');
+        const rv = parseFloat(r.value);
+        if (!r.value.trim())    { markInvalid(r, 'Required.');      bad.push(r); }
+        else if (!isFinite(rv)) { markInvalid(r, 'Not a number.');  bad.push(r); }
+        else if (rv <= 0)       { markInvalid(r, 'Must be > $0.');  bad.push(r); }
+
+        return bad;
+    }
+
+    form.addEventListener('submit', function (e) {
+        if (submitting) { e.preventDefault(); return; }
+
+        errBox.classList.add('d-none');
+        tbody.querySelectorAll('.is-invalid').forEach(el => el.classList.remove('is-invalid'));
+
+        let firstBad = null, badRows = 0, realRows = 0;
+        tbody.querySelectorAll('tr').forEach(function (tr) {
+            if (rowIsBlank(tr)) return;
+            realRows++;
+            const bad = validateRow(tr);
+            if (bad.length) {
+                badRows++;
+                if (!firstBad) firstBad = bad[0];
+            }
+        });
+
+        if (realRows === 0) {
+            e.preventDefault();
+            errText.textContent = 'Enter at least one entry before saving.';
+            errBox.classList.remove('d-none');
+            errBox.scrollIntoView({block: 'center', behavior: 'smooth'});
+            return;
+        }
+        if (firstBad) {
+            e.preventDefault();
+            errText.textContent = badRows + ' row(s) need attention — fix the highlighted fields and try again.';
+            errBox.classList.remove('d-none');
+            firstBad.scrollIntoView({block: 'center', behavior: 'smooth'});
+            firstBad.focus({preventScroll: true});
+            return;
+        }
+
+        submitting = true;
+        saveBtn.disabled = true;
+        saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Saving...';
+    });
+
+    updateTotals();
+})();
+</script>
+{% endblock %}

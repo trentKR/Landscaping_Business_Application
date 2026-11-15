@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Account — Clips Admin{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <h1><i class="bi bi-person-circle"></i> Account</h1>
+</div>
+
+<div class="card" style="max-width: 640px;">
+    <div class="card-body">
+        <h5 class="card-title mb-1">
+            <i class="bi bi-key-fill me-2"></i>Change Password
+        </h5>
+        <p class="text-muted mb-3">
+            Signed in as <strong>{{ current_user.username }}</strong>.
+            Passwords must be at least {{ min_length }} characters.
+        </p>
+
+        <form method="POST" action="{{ url_for('settings.account_settings') }}" novalidate>
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="mb-3">
+                <label for="current_password" class="form-label">Current password</label>
+                <input type="password" class="form-control" id="current_password"
+                       name="current_password" required autocomplete="current-password">
+            </div>
+            <div class="mb-3">
+                <label for="new_password" class="form-label">New password</label>
+                <input type="password" class="form-control" id="new_password"
+                       name="new_password" required autocomplete="new-password"
+                       minlength="{{ min_length }}">
+            </div>
+            <div class="mb-3">
+                <label for="confirm_password" class="form-label">Confirm new password</label>
+                <input type="password" class="form-control" id="confirm_password"
+                       name="confirm_password" required autocomplete="new-password"
+                       minlength="{{ min_length }}">
+            </div>
+            <button type="submit" class="btn btn-primary">
+                <i class="bi bi-check-lg me-1"></i>Update Password
+            </button>
+        </form>
+    </div>
+</div>
+{% endblock %}
